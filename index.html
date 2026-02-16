@@ -1402,8 +1402,9 @@ function escHtml(s) { const d=document.createElement('div'); d.textContent=s; re
 // GOOGLE DRIVE SYNC
 // ============================================================
 const GAS_URL_KEY = 'personality_observer_gas_url';
+const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbx2yjvG4nCRF6XaZ-SjKk5J-MdStU9hJ1GtOoAfgt38yUHO4ilrcwhXJ2HYcB1iGvBG6g/exec';
 
-function getGasUrl() { return localStorage.getItem(GAS_URL_KEY) || ''; }
+function getGasUrl() { return localStorage.getItem(GAS_URL_KEY) || DEFAULT_GAS_URL; }
 
 function saveGasUrl() {
   const url = document.getElementById('gasUrlInput').value.trim();
@@ -1985,8 +1986,7 @@ updateBadge();
 const savedKey = localStorage.getItem('anthropic_api_key');
 if (savedKey) document.getElementById('apiKeyInput').value = savedKey;
 // Restore GAS URL & Drive UI
-const savedGasUrl = getGasUrl();
-if (savedGasUrl) document.getElementById('gasUrlInput').value = savedGasUrl;
+document.getElementById('gasUrlInput').value = getGasUrl();
 updateDriveUI();
 </script>
 </body>
