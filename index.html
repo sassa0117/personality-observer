@@ -1798,11 +1798,22 @@ async function runInitialCoaching(name) {
     return;
   }
 
-  chatHistory.push({role:'system', content:'総合コーチング分析を実行中...', time:nowStr()});
-  renderChatMessages();
-
   const model = document.getElementById('modelSelect').value;
-  const coachingPrompt = COACHING_SYSTEM_PROMPT;
+  await streamChatResponse(name, COACHING_SYSTEM_PROMPT, [{ role: 'user', content: dataStr }], model, apiKey);
+}
+
+function autoResize(el) {
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight, 240) + 'px';
+}
+
+async function streamChatResponse(personName, systemPrompt, messages, model, apiKey) {
+  // Add a placeholder AI message
+  chatHistory.push({role:'assistant', content:'', time: nowStr()});
+  renderChatMessages();
+  const msgIdx = chatHistory.length - 1;
+  const msgContainer = document.getElementById('chatMessages');
+  const lastBubble = msgContainer.lastElementChild;
 
   try {
     const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -1816,8 +1827,9 @@ async function runInitialCoaching(name) {
       body: JSON.stringify({
         model: model,
         max_tokens: 4096,
-        system: coachingPrompt,
-        messages: [{ role: 'user', content: dataStr }]
+        stream: true,
+        system: systemPrompt,
+        messages: messages
       })
     });
 
@@ -1826,24 +1838,39 @@ async function runInitialCoaching(name) {
       throw new Error(err.error?.message || 'API Error');
     }
 
-    const data = await response.json();
-    const text = data.content[0].text;
-    // Replace the loading message
-    chatHistory.pop();
-    chatHistory.push({role:'assistant', content: text, time: nowStr()});
-    saveChatHistory(name, chatHistory);
-    renderChatMessages();
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let fullText = '';
+    let buffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        const jsonStr = line.slice(6);
+        if (jsonStr === '[DONE]') continue;
+        try {
+          const evt = JSON.parse(jsonStr);
+          if (evt.type === 'content_block_delta' && evt.delta?.text) {
+            fullText += evt.delta.text;
+            lastBubble.innerHTML = formatAIResponse(fullText) + `<span class="time">${chatHistory[msgIdx].time}</span>`;
+            msgContainer.scrollTop = msgContainer.scrollHeight;
+          }
+        } catch {}
+      }
+    }
+
+    chatHistory[msgIdx].content = fullText;
+    saveChatHistory(personName, chatHistory);
   } catch (e) {
-    chatHistory.pop();
-    chatHistory.push({role:'system', content:'エラー: ' + e.message, time: nowStr()});
-    saveChatHistory(name, chatHistory);
+    chatHistory[msgIdx] = {role:'system', content:'エラー: ' + e.message, time: nowStr()};
+    saveChatHistory(personName, chatHistory);
     renderChatMessages();
   }
-}
-
-function autoResize(el) {
-  el.style.height = 'auto';
-  el.style.height = Math.min(el.scrollHeight, 240) + 'px';
 }
 
 async function sendChat() {
@@ -1857,7 +1884,6 @@ async function sendChat() {
   input.value = '';
   input.style.height = '';
   chatHistory.push({role:'user', content: text, time: nowStr()});
-  chatHistory.push({role:'system', content:'考え中...', time:''});
   saveChatHistory(chatPersonName, chatHistory);
   renderChatMessages();
 
@@ -1876,46 +1902,11 @@ ${dataStr}
 - ADHD/HSP/鬱/躁鬱/ASD等の傾向がデータから読み取れる場合は指摘し、「扱えたら強い」活用法をセットで提示
 - 日本語で回答`;
 
-  // Build messages from chat history (exclude system messages and the loading one)
   const messages = chatHistory
     .filter(m => m.role === 'user' || m.role === 'assistant')
     .map(m => ({role: m.role, content: m.content}));
 
-  try {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true'
-      },
-      body: JSON.stringify({
-        model: model,
-        max_tokens: 4096,
-        system: systemPrompt,
-        messages: messages
-      })
-    });
-
-    if (!response.ok) {
-      const err = await response.json();
-      throw new Error(err.error?.message || 'API Error');
-    }
-
-    const data = await response.json();
-    const reply = data.content[0].text;
-    // Replace loading message
-    chatHistory.pop();
-    chatHistory.push({role:'assistant', content: reply, time: nowStr()});
-    saveChatHistory(chatPersonName, chatHistory);
-    renderChatMessages();
-  } catch (e) {
-    chatHistory.pop();
-    chatHistory.push({role:'system', content:'エラー: ' + e.message, time: nowStr()});
-    saveChatHistory(chatPersonName, chatHistory);
-    renderChatMessages();
-  }
+  await streamChatResponse(chatPersonName, systemPrompt, messages, model, apiKey);
 }
 
 // ============================================================
