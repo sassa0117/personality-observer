@@ -264,10 +264,10 @@ canvas{max-width:100%;height:auto}
 .chat-msg.ai{align-self:flex-start;background:var(--surface);box-shadow:var(--shadow);border-bottom-left-radius:4px}
 .chat-msg.system{align-self:center;background:var(--success-bg);color:#166534;font-size:.78em;text-align:center;border-radius:10px;max-width:95%}
 .chat-msg .time{font-size:.62em;opacity:.6;margin-top:4px;display:block}
-.chat-input-bar{position:sticky;bottom:0;display:flex;gap:8px;padding:10px 0;background:var(--bg)}
-.chat-input-bar textarea{flex:1;padding:11px 14px;border:2px solid var(--border);border-radius:14px;font-size:.9em;line-height:1.5;resize:none;outline:none;font-family:inherit;background:var(--surface);min-height:44px;max-height:120px}
+.chat-input-bar{position:sticky;bottom:0;display:flex;gap:8px;padding:10px 0;background:var(--bg);align-items:flex-end}
+.chat-input-bar textarea{flex:1;padding:12px 14px;border:2px solid var(--border);border-radius:16px;font-size:.92em;line-height:1.6;resize:none;outline:none;font-family:inherit;background:var(--surface);min-height:52px;max-height:240px;overflow-y:auto}
 .chat-input-bar textarea:focus{border-color:var(--accent)}
-.chat-input-bar button{padding:0 18px;border-radius:14px;border:none;background:var(--accent);color:#fff;font-weight:700;font-size:.88em;cursor:pointer;flex-shrink:0;-webkit-tap-highlight-color:transparent}
+.chat-input-bar button{padding:14px 20px;border-radius:16px;border:none;background:var(--accent);color:#fff;font-weight:700;font-size:.88em;cursor:pointer;flex-shrink:0;-webkit-tap-highlight-color:transparent;margin-bottom:2px}
 .chat-input-bar button:disabled{opacity:.3}
 .chat-loading{text-align:center;padding:16px;color:var(--accent);font-size:.82em;font-weight:600}
 </style>
@@ -414,9 +414,19 @@ canvas{max-width:100%;height:auto}
   <div class="view" id="view-chat">
     <div class="detail-back" onclick="switchTab('list')">← 一覧に戻る</div>
     <div class="chat-person-header" id="chatHeader"></div>
+    <div id="chatApiKeySection" style="display:none">
+      <div class="card" style="border:2px solid var(--danger)">
+        <div style="font-size:.88em;font-weight:700;margin-bottom:8px;color:var(--danger)">APIキーが必要です</div>
+        <div class="api-key-row">
+          <input type="password" id="chatApiKeyInput" placeholder="sk-ant-...">
+          <button onclick="saveChatApiKey()" style="background:var(--accent);color:#fff;border:none;padding:10px 16px;border-radius:10px;font-weight:700;cursor:pointer">保存して分析開始</button>
+        </div>
+        <div style="font-size:.68em;color:var(--text-muted);margin-top:6px">Anthropic APIキーを入力。ブラウザのlocalStorageにのみ保存されます。</div>
+      </div>
+    </div>
     <div class="chat-messages" id="chatMessages"></div>
     <div class="chat-input-bar">
-      <textarea id="chatInput" placeholder="この人について質問..." rows="1" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChat()}"></textarea>
+      <textarea id="chatInput" placeholder="この人について質問..." rows="2" oninput="autoResize(this)" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChat()}"></textarea>
       <button onclick="sendChat()" id="chatSendBtn">送信</button>
     </div>
   </div>
@@ -1764,12 +1774,19 @@ function nowStr() {
   return `${d.getMonth()+1}/${d.getDate()} ${d.getHours()}:${String(d.getMinutes()).padStart(2,'0')}`;
 }
 
+function saveChatApiKey() {
+  const key = document.getElementById('chatApiKeyInput').value.trim();
+  if (!key) return;
+  localStorage.setItem('anthropic_api_key', key);
+  document.getElementById('apiKeyInput').value = key;
+  document.getElementById('chatApiKeySection').style.display = 'none';
+  if (chatPersonName) runInitialCoaching(chatPersonName);
+}
+
 async function runInitialCoaching(name) {
   const apiKey = localStorage.getItem('anthropic_api_key');
   if (!apiKey) {
-    chatHistory.push({role:'system', content:'APIキーが未設定です。「AI分析」タブでAPIキーを設定してください。', time:nowStr()});
-    saveChatHistory(name, chatHistory);
-    renderChatMessages();
+    document.getElementById('chatApiKeySection').style.display = 'block';
     return;
   }
 
@@ -1824,6 +1841,11 @@ async function runInitialCoaching(name) {
   }
 }
 
+function autoResize(el) {
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight, 240) + 'px';
+}
+
 async function sendChat() {
   const input = document.getElementById('chatInput');
   const text = input.value.trim();
@@ -1833,6 +1855,7 @@ async function sendChat() {
   if (!apiKey) { alert('APIキーを設定してください'); return; }
 
   input.value = '';
+  input.style.height = '';
   chatHistory.push({role:'user', content: text, time: nowStr()});
   chatHistory.push({role:'system', content:'考え中...', time:''});
   saveChatHistory(chatPersonName, chatHistory);
