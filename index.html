@@ -1,0 +1,1673 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>パーソナリティ Observer</title>
+<style>
+:root {
+  --bg:#f5f7fa;--surface:#fff;--surface2:#f0f2f5;--text:#2d3436;--text-muted:#888;
+  --border:#e1e5ea;--shadow:0 2px 12px rgba(0,0,0,.06);--radius:14px;
+  --accent:#5b6abf;--accent-bg:#eef0ff;
+  --danger:#e74c3c;--danger-bg:#fdf0ef;
+  --success:#27ae60;--success-bg:#e8f8ef;
+  --dark:#7c3aed;--dark-bg:#f3eeff;
+  --type:#0891b2;--type-bg:#ecfeff;
+  --entre:#d97706;--entre-bg:#fffbeb;
+  --capital:#059669;--capital-bg:#ecfdf5;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Hiragino Sans','Noto Sans JP',sans-serif;background:var(--bg);color:var(--text);line-height:1.7;min-height:100vh;-webkit-text-size-adjust:100%}
+.container{max-width:640px;margin:0 auto;padding:12px;padding-bottom:100px}
+.app-header{text-align:center;padding:20px 0 12px}
+.app-header h1{font-size:1.3em;font-weight:800;color:var(--accent)}
+.app-header .sub{color:var(--text-muted);font-size:.78em;margin-top:2px}
+
+/* Tabs */
+.tabs{display:flex;background:var(--surface);border-radius:12px;padding:3px;margin-bottom:16px;box-shadow:var(--shadow);gap:2px}
+.tab{flex:1;text-align:center;padding:9px 4px;border-radius:10px;font-size:.8em;font-weight:600;cursor:pointer;transition:.2s;color:var(--text-muted);position:relative;-webkit-tap-highlight-color:transparent}
+.tab.active{background:var(--accent);color:#fff;box-shadow:0 2px 8px rgba(91,106,191,.3)}
+.tab .badge{position:absolute;top:2px;right:4px;background:var(--danger);color:#fff;font-size:.6em;padding:1px 5px;border-radius:10px;font-weight:700}
+
+.view{display:none}.view.active{display:block}
+
+/* Shared card */
+.card{background:var(--surface);border-radius:var(--radius);padding:18px;margin-bottom:12px;box-shadow:var(--shadow)}
+
+/* Module selection */
+.module-grid{display:flex;flex-direction:column;gap:10px;margin-bottom:16px}
+.module-card{display:flex;align-items:center;gap:14px;padding:16px;background:var(--surface);border-radius:var(--radius);box-shadow:var(--shadow);cursor:pointer;border:2px solid transparent;transition:.15s;-webkit-tap-highlight-color:transparent}
+.module-card.selected{border-color:var(--accent);background:var(--accent-bg)}
+.module-card:active{transform:scale(.98)}
+.module-check{width:24px;height:24px;border-radius:7px;border:2px solid var(--border);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:.8em;transition:.15s}
+.module-card.selected .module-check{background:var(--accent);border-color:var(--accent);color:#fff}
+.module-info{flex:1}
+.module-info .name{font-weight:700;font-size:.92em}
+.module-info .desc{font-size:.72em;color:var(--text-muted)}
+.module-info .count{font-size:.68em;font-weight:600;margin-top:2px}
+
+/* Name input */
+.name-wrap{text-align:center;margin-bottom:14px}
+.name-wrap label{display:block;font-size:.82em;color:var(--text-muted);margin-bottom:6px}
+.name-wrap input{border:2px solid var(--border);padding:11px 16px;border-radius:10px;font-size:1em;text-align:center;width:100%;max-width:260px;outline:none;transition:.2s;background:var(--surface2)}
+.name-wrap input:focus{border-color:var(--accent)}
+
+/* Progress */
+.progress-wrap{display:flex;align-items:center;gap:8px;margin-bottom:14px}
+.progress-bar{flex:1;background:var(--border);border-radius:10px;height:7px;overflow:hidden}
+.progress-fill{height:100%;border-radius:10px;transition:width .4s ease}
+.progress-text{font-size:.75em;font-weight:700;white-space:nowrap}
+
+/* Section header in questionnaire */
+.section-header{padding:10px 16px;border-radius:10px;margin-bottom:10px;font-weight:700;font-size:.85em;color:#fff}
+
+/* Question card */
+.q-card{background:var(--surface);border-radius:var(--radius);padding:18px;margin-bottom:10px;box-shadow:var(--shadow);border-left:4px solid var(--accent)}
+.q-meta{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+.q-num{font-size:.72em;font-weight:700}
+.q-tag{font-size:.62em;padding:2px 7px;border-radius:6px;font-weight:600}
+.q-text{font-size:.95em;margin-bottom:4px;font-weight:600}
+.q-hint{font-size:.74em;color:var(--text-muted);margin-bottom:12px}
+
+/* Likert */
+.likert{display:flex;gap:5px}
+.likert label{flex:1;text-align:center;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.likert input{display:none}
+.likert .chip{display:flex;flex-direction:column;align-items:center;padding:9px 2px;border-radius:10px;background:var(--surface2);border:2px solid transparent;transition:.15s;font-size:.95em;font-weight:700;color:var(--text-muted)}
+.likert .chip-label{font-size:.5em;font-weight:500;margin-top:2px;line-height:1.2;color:inherit}
+.likert label:active .chip{transform:scale(.95)}
+.likert input:checked+.chip{color:#fff;box-shadow:0 2px 10px rgba(0,0,0,.12)}
+
+/* Nav */
+.nav-buttons{display:flex;gap:10px;margin:16px 0;position:sticky;bottom:12px;z-index:10}
+.nav-btn{flex:1;padding:13px;border-radius:12px;border:none;font-size:.95em;font-weight:700;cursor:pointer;transition:.15s;-webkit-tap-highlight-color:transparent}
+.nav-btn:disabled{opacity:.3;cursor:not-allowed}
+.nav-btn:active:not(:disabled){transform:scale(.97)}
+.btn-primary{background:var(--accent);color:#fff;box-shadow:0 4px 12px rgba(91,106,191,.3)}
+.btn-secondary{background:var(--surface);color:var(--text);border:2px solid var(--border)}
+.btn-save{background:var(--success-bg);color:var(--success);border:1px solid var(--success)}
+.btn-ai{background:var(--dark-bg);color:var(--dark);border:1px solid var(--dark)}
+
+/* Results */
+.result-header{text-align:center;margin-bottom:20px}
+.result-header h2{font-size:1.15em;font-weight:800;color:var(--accent)}
+.result-header .date{font-size:.78em;color:var(--text-muted)}
+
+.section-title{font-size:1em;font-weight:800;padding:12px 0 8px;border-bottom:2px solid var(--border);margin:20px 0 12px;display:flex;align-items:center;gap:8px}
+.section-title .dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+
+.trait-card{background:var(--surface);border-radius:var(--radius);padding:18px;margin-bottom:12px;box-shadow:var(--shadow)}
+.trait-title-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.trait-name{font-size:.9em;font-weight:700}
+.trait-badge{font-size:1em;font-weight:800;padding:2px 10px;border-radius:8px}
+
+.bar-row{display:flex;align-items:center;margin-bottom:5px;gap:6px}
+.bar-label{width:72px;font-size:.72em;font-weight:600;text-align:right;flex-shrink:0}
+.bar-track{flex:1;height:20px;background:var(--surface2);border-radius:10px;overflow:hidden}
+.bar-fill{height:100%;border-radius:10px;transition:width .8s;display:flex;align-items:center;justify-content:flex-end;padding-right:6px;font-size:.65em;font-weight:700;color:#fff;min-width:32px}
+.bar-value{width:38px;font-size:.75em;font-weight:700;flex-shrink:0;text-align:right}
+
+.spectrum{display:flex;align-items:center;gap:5px;margin:8px 0}
+.spectrum-label{font-size:.6em;font-weight:600;width:58px;text-align:center;flex-shrink:0;line-height:1.3}
+.spectrum-track{flex:1;height:7px;border-radius:4px;position:relative}
+.spectrum-marker{position:absolute;top:-7px;width:20px;height:20px;border:3px solid #fff;border-radius:50%;transform:translateX(-50%);box-shadow:0 2px 6px rgba(0,0,0,.2);transition:left .8s}
+
+.facets-info{margin-top:6px;font-size:.7em;color:var(--text-muted);line-height:1.6}
+.calc-toggle{display:inline-block;font-size:.75em;color:var(--accent);cursor:pointer;font-weight:600;margin-top:6px;padding:3px 0;-webkit-tap-highlight-color:transparent}
+.calc-detail{display:none;background:var(--surface2);border-radius:10px;padding:12px;margin-top:6px;font-size:.78em}
+.calc-detail.show{display:block}
+.calc-row{display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border);gap:6px}
+.calc-row:last-child{border-bottom:none}
+.calc-row .calc-formula{flex-shrink:0;color:var(--text-muted);font-size:.88em;text-align:right}
+.calc-row.reverse .calc-formula{color:var(--danger)}
+.calc-row.total{font-weight:700;border-top:2px solid var(--border);margin-top:4px;padding-top:6px}
+
+/* 4 Types highlight */
+.type-highlight{text-align:center;padding:20px;border-radius:var(--radius);margin-bottom:14px}
+.type-highlight .label{font-size:.8em;font-weight:600;margin-bottom:4px}
+.type-highlight .primary{font-size:1.4em;font-weight:800}
+.type-highlight .sub{font-size:.78em;margin-top:4px}
+
+/* Dark Triad interpretations */
+.interp{display:flex;gap:10px;margin-top:8px;font-size:.75em}
+.interp .biz{flex:1;padding:8px;border-radius:8px;background:var(--success-bg);color:#1e7a44}
+.interp .shadow{flex:1;padding:8px;border-radius:8px;background:var(--danger-bg);color:#c0392b}
+.interp b{display:block;margin-bottom:2px;font-size:.9em}
+
+/* Radar */
+.radar-section{text-align:center;background:var(--surface);border-radius:var(--radius);padding:16px 8px;margin-bottom:12px;box-shadow:var(--shadow)}
+.radar-section h3{font-size:.88em;margin-bottom:8px;color:var(--text-muted)}
+canvas{max-width:100%;height:auto}
+.legend{display:flex;justify-content:center;gap:16px;margin-top:6px;font-size:.72em}
+.legend-dot{display:inline-block;width:10px;height:10px;border-radius:50%;vertical-align:middle;margin-right:3px}
+
+/* Summary */
+.summary-card{background:var(--surface);border-radius:var(--radius);padding:18px;margin:12px 0;box-shadow:var(--shadow)}
+.summary-card h3{font-size:.9em;margin-bottom:10px}
+.summary-text{font-size:.85em;line-height:1.9}
+
+.result-actions{display:flex;gap:8px;margin:16px 0;flex-wrap:wrap}
+.result-actions .nav-btn{font-size:.85em;padding:11px}
+
+/* List */
+.list-empty{text-align:center;padding:50px 20px;color:var(--text-muted)}
+.list-empty p{font-size:.88em}
+.saved-card{background:var(--surface);border-radius:var(--radius);padding:14px;margin-bottom:10px;box-shadow:var(--shadow);cursor:pointer;transition:.15s;-webkit-tap-highlight-color:transparent}
+.saved-card:active{transform:scale(.98)}
+.saved-card-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+.saved-card-name{font-weight:700;font-size:.95em}
+.saved-card-date{font-size:.72em;color:var(--text-muted)}
+.saved-card-scores{display:flex;gap:4px;flex-wrap:wrap}
+.mini-score{font-size:.65em;font-weight:700;padding:2px 6px;border-radius:5px}
+.saved-card-actions{display:flex;gap:6px;margin-top:8px;justify-content:flex-end}
+.small-btn{font-size:.72em;padding:4px 10px;border-radius:7px;border:1px solid var(--border);background:var(--surface2);cursor:pointer;font-weight:600;-webkit-tap-highlight-color:transparent}
+.small-btn.delete{color:var(--danger);border-color:var(--danger);background:var(--danger-bg)}
+
+.detail-back{display:inline-flex;align-items:center;gap:4px;font-size:.82em;color:var(--accent);font-weight:600;cursor:pointer;margin-bottom:14px;-webkit-tap-highlight-color:transparent}
+
+/* AI Analysis */
+.api-key-section{margin-bottom:14px}
+.api-key-section label{font-size:.82em;font-weight:600;display:block;margin-bottom:6px}
+.api-key-row{display:flex;gap:8px}
+.api-key-row input{flex:1;padding:10px 12px;border:2px solid var(--border);border-radius:10px;font-size:.88em;outline:none;background:var(--surface2)}
+.api-key-row input:focus{border-color:var(--dark)}
+.api-key-row button{padding:10px 16px;border-radius:10px;border:none;background:var(--dark);color:#fff;font-weight:700;font-size:.82em;cursor:pointer}
+.model-select{margin-top:8px;font-size:.8em}
+.model-select select{padding:6px 10px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);font-size:1em}
+.ai-textarea{width:100%;min-height:120px;padding:14px;border:2px solid var(--border);border-radius:var(--radius);font-size:.92em;line-height:1.6;resize:vertical;outline:none;font-family:inherit;background:var(--surface)}
+.ai-textarea:focus{border-color:var(--dark)}
+.ai-context-toggle{display:flex;align-items:center;gap:8px;font-size:.82em;margin:10px 0;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.ai-context-toggle input{width:18px;height:18px;accent-color:var(--dark)}
+.ai-prompts{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0}
+.ai-prompt-chip{font-size:.72em;padding:5px 10px;border-radius:8px;background:var(--dark-bg);color:var(--dark);border:1px solid transparent;cursor:pointer;font-weight:600;-webkit-tap-highlight-color:transparent;transition:.15s}
+.ai-prompt-chip:hover,.ai-prompt-chip:active{border-color:var(--dark)}
+.ai-result{background:var(--surface);border-radius:var(--radius);padding:18px;margin-top:14px;box-shadow:var(--shadow);font-size:.88em;line-height:1.9;white-space:pre-wrap}
+.ai-loading{text-align:center;padding:30px;color:var(--dark);font-weight:600}
+
+/* Person group */
+.person-group{margin-bottom:18px}
+.person-header{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;background:var(--accent);color:#fff;border-radius:var(--radius) var(--radius) 0 0;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.person-header .name{font-weight:700;font-size:.95em}
+.person-header .count{font-size:.72em;opacity:.8}
+.person-entries{background:var(--surface);border-radius:0 0 var(--radius) var(--radius);box-shadow:var(--shadow);overflow:hidden}
+.person-entry{display:flex;justify-content:space-between;align-items:center;padding:10px 16px;border-bottom:1px solid var(--border);cursor:pointer;transition:.1s;-webkit-tap-highlight-color:transparent}
+.person-entry:last-child{border-bottom:none}
+.person-entry:active{background:var(--surface2)}
+.person-entry .date{font-size:.78em;color:var(--text-muted);font-weight:600}
+.person-entry .scores{display:flex;gap:3px;flex-wrap:wrap;flex:1;margin:0 10px}
+.person-entry .del-btn{font-size:.68em;color:var(--danger);cursor:pointer;padding:3px 8px;border-radius:6px;border:1px solid var(--danger);background:var(--danger-bg);flex-shrink:0}
+.timeline-btn{display:block;width:100%;padding:10px;text-align:center;font-size:.82em;font-weight:700;color:var(--accent);background:var(--accent-bg);border:none;cursor:pointer;border-radius:0 0 var(--radius) var(--radius);-webkit-tap-highlight-color:transparent}
+.timeline-btn:active{opacity:.7}
+
+/* Timeline chart */
+.timeline-section{background:var(--surface);border-radius:var(--radius);padding:16px;margin-bottom:14px;box-shadow:var(--shadow)}
+.timeline-section h3{font-size:.9em;margin-bottom:4px;font-weight:700}
+.timeline-section .sub{font-size:.72em;color:var(--text-muted);margin-bottom:10px}
+.timeline-legend{display:flex;gap:10px;flex-wrap:wrap;margin-top:8px;font-size:.68em}
+.timeline-legend span{display:flex;align-items:center;gap:3px}
+.timeline-legend .dot{width:8px;height:8px;border-radius:50%}
+.change-indicator{font-size:.72em;font-weight:700;padding:2px 6px;border-radius:5px;margin-left:4px}
+.change-up{color:#16a34a;background:#f0fdf4}
+.change-down{color:#dc2626;background:#fef2f2}
+.change-flat{color:var(--text-muted);background:var(--surface2)}
+
+/* Export/Import */
+.data-actions{display:flex;gap:8px;margin:14px 0;flex-wrap:wrap}
+.data-actions button{flex:1;padding:10px;border-radius:10px;font-size:.82em;font-weight:700;cursor:pointer;border:1px solid var(--border);background:var(--surface);-webkit-tap-highlight-color:transparent;min-width:120px}
+.data-actions button:active{transform:scale(.97)}
+.data-actions .export-btn{color:var(--accent);border-color:var(--accent);background:var(--accent-bg)}
+.data-actions .import-btn{color:var(--success);border-color:var(--success);background:var(--success-bg)}
+
+/* Google Drive sync */
+.drive-section{background:var(--surface);border-radius:var(--radius);padding:16px;margin-bottom:14px;box-shadow:var(--shadow);border:2px solid var(--border)}
+.drive-section.connected{border-color:var(--success)}
+.drive-header{display:flex;align-items:center;gap:8px;margin-bottom:10px;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.drive-header .icon{font-size:1.2em}
+.drive-header .title{font-weight:700;font-size:.88em;flex:1}
+.drive-header .status{font-size:.68em;font-weight:600;padding:3px 8px;border-radius:6px}
+.drive-header .status.on{color:var(--success);background:var(--success-bg)}
+.drive-header .status.off{color:var(--text-muted);background:var(--surface2)}
+.drive-body{display:none}
+.drive-body.open{display:block}
+.drive-url-row{display:flex;gap:8px;margin-bottom:8px}
+.drive-url-row input{flex:1;padding:9px 12px;border:2px solid var(--border);border-radius:10px;font-size:.8em;outline:none;background:var(--surface2)}
+.drive-url-row input:focus{border-color:var(--success)}
+.drive-url-row button{padding:9px 14px;border-radius:10px;border:none;background:var(--success);color:#fff;font-weight:700;font-size:.78em;cursor:pointer;white-space:nowrap}
+.drive-help{font-size:.68em;color:var(--text-muted);line-height:1.6;margin-bottom:10px}
+.drive-buttons{display:flex;gap:8px}
+.drive-buttons button{flex:1;padding:10px;border-radius:10px;font-size:.8em;font-weight:700;cursor:pointer;border:1px solid var(--border);-webkit-tap-highlight-color:transparent}
+.drive-buttons button:active{transform:scale(.97)}
+.drive-buttons .sync-btn{color:#fff;background:var(--success);border-color:var(--success)}
+.drive-buttons .load-btn{color:var(--accent);background:var(--accent-bg);border-color:var(--accent)}
+.drive-sync-status{font-size:.72em;text-align:center;margin-top:8px;font-weight:600;min-height:1.6em}
+
+@media(max-width:480px){
+  .container{padding:8px;padding-bottom:100px}
+  .q-card{padding:14px}
+  .likert .chip{padding:7px 1px;font-size:.85em}
+  .likert .chip-label{font-size:.45em}
+  .bar-label{width:58px;font-size:.65em}
+  .spectrum-label{width:50px;font-size:.55em}
+  .trait-card{padding:14px}
+  .calc-row{flex-direction:column;gap:1px}
+  .calc-row .calc-formula{text-align:left}
+  .interp{flex-direction:column}
+}
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="app-header">
+    <h1>Personality Observer</h1>
+    <div class="sub">他者の性格・適性を多角的に予測するツール</div>
+  </div>
+
+  <div class="tabs">
+    <div class="tab active" data-tab="test" onclick="switchTab('test')">診断</div>
+    <div class="tab" data-tab="ai" onclick="switchTab('ai')">AI分析</div>
+    <div class="tab" data-tab="list" onclick="switchTab('list')">一覧<span class="badge" id="listBadge" style="display:none">0</span></div>
+  </div>
+
+  <!-- ===== TEST VIEW ===== -->
+  <div class="view active" id="view-test">
+    <!-- Step 1: Setup -->
+    <div id="setupPhase">
+      <div class="card name-wrap">
+        <label>予測する相手の名前（任意）</label>
+        <input type="text" id="targetName" placeholder="例：田中さん">
+      </div>
+      <div style="font-size:.88em;font-weight:700;margin-bottom:10px">実施するモジュールを選択</div>
+      <div class="module-grid" id="moduleGrid"></div>
+      <button class="nav-btn btn-primary" style="width:100%" onclick="startAssessment()">診断を開始する</button>
+    </div>
+
+    <!-- Step 2: Questions -->
+    <div id="questionPhase" style="display:none">
+      <div class="progress-wrap">
+        <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+        <div class="progress-text" id="progressText">0/0</div>
+      </div>
+      <div id="questionnaire"></div>
+      <div class="nav-buttons" id="navButtons">
+        <button class="nav-btn btn-secondary" id="prevBtn" onclick="changePage(-1)" disabled>戻る</button>
+        <button class="nav-btn btn-primary" id="nextBtn" onclick="changePage(1)">次へ</button>
+      </div>
+    </div>
+
+    <!-- Step 3: Results -->
+    <div id="resultPhase" style="display:none">
+      <div class="result-header">
+        <h2 id="resultTitle">予測結果</h2>
+        <div class="date" id="resultDate"></div>
+      </div>
+      <div id="resultContent"></div>
+      <div class="result-actions">
+        <button class="nav-btn btn-save" onclick="saveResult()">保存する</button>
+        <button class="nav-btn btn-ai" onclick="goToAI()">AIに分析してもらう</button>
+        <button class="nav-btn btn-secondary" onclick="resetAll()">新しく診断</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== AI VIEW ===== -->
+  <div class="view" id="view-ai">
+    <div class="card api-key-section">
+      <label>Anthropic API キー</label>
+      <div class="api-key-row">
+        <input type="password" id="apiKeyInput" placeholder="sk-ant-...">
+        <button onclick="saveApiKey()">保存</button>
+      </div>
+      <div style="font-size:.68em;color:var(--text-muted);margin-top:4px">キーはブラウザのlocalStorageにのみ保存されます</div>
+      <div class="model-select">
+        <label style="font-size:.8em">モデル:
+        <select id="modelSelect">
+          <option value="claude-sonnet-4-5-20250929">Sonnet 4.5（推奨）</option>
+          <option value="claude-haiku-4-5-20251001">Haiku 4.5（高速・低コスト）</option>
+        </select></label>
+      </div>
+    </div>
+
+    <div class="card">
+      <div style="font-size:.88em;font-weight:700;margin-bottom:8px">この人について自由に書いてください</div>
+      <div style="font-size:.72em;color:var(--text-muted);margin-bottom:8px">主観でOK。「こういうところがある」「こんな場面を見た」など</div>
+      <textarea class="ai-textarea" id="aiInput" placeholder="例：最近知り合った人で、最初は静かだったけど仲良くなると結構毒舌。仕事はめちゃくちゃ早いけど雑なところもある。飲み会では後輩の面倒見がいい..."></textarea>
+      <label class="ai-context-toggle"><input type="checkbox" id="includeScores" checked>直近の診断結果を含める</label>
+      <div class="ai-prompts">
+        <span class="ai-prompt-chip" onclick="setAIPrompt('この人の強みと弱みを分析して')">強み・弱み</span>
+        <span class="ai-prompt-chip" onclick="setAIPrompt('この人は信頼できるか？多角的に考えて')">信頼度</span>
+        <span class="ai-prompt-chip" onclick="setAIPrompt('この人とうまく付き合うコミュニケーション戦略は？')">付き合い方</span>
+        <span class="ai-prompt-chip" onclick="setAIPrompt('ビジネスパートナーとしての適性は？')">ビジネス適性</span>
+        <span class="ai-prompt-chip" onclick="setAIPrompt('この人が見せていない裏の顔の可能性は？')">裏の顔</span>
+      </div>
+      <button class="nav-btn btn-primary" style="width:100%;background:var(--dark)" onclick="runAI()">分析する</button>
+      <div style="margin-top:12px;padding-top:12px;border-top:2px solid var(--border)">
+        <div style="font-size:.82em;font-weight:700;margin-bottom:8px;color:#059669">総合コーチング（全データ統合）</div>
+        <div style="font-size:.72em;color:var(--text-muted);margin-bottom:8px">この人の全保存データを統合し、性格・適性・資本を横断的に分析。「惜しいところ」「伸ばせば変わるところ」をコーチング視点で提示します。</div>
+        <button class="nav-btn" style="width:100%;background:#059669;color:#fff;font-size:.88em" onclick="runCoachingAI()">総合コーチング分析</button>
+      </div>
+    </div>
+    <div id="aiResult"></div>
+  </div>
+
+  <!-- ===== LIST VIEW ===== -->
+  <div class="view" id="view-list">
+    <div class="drive-section" id="driveSection">
+      <div class="drive-header" onclick="toggleDrivePanel()">
+        <span class="icon">☁️</span>
+        <span class="title">Google Drive 同期</span>
+        <span class="status off" id="driveStatus">未接続</span>
+      </div>
+      <div class="drive-body" id="driveBody">
+        <div class="drive-help">
+          GASウェブアプリのURLを入力してください。<br>
+          設定手順は <code>personality-observer-gas.gs</code> のコメントを参照。
+        </div>
+        <div class="drive-url-row">
+          <input type="text" id="gasUrlInput" placeholder="https://script.google.com/macros/s/...">
+          <button onclick="saveGasUrl()">保存</button>
+        </div>
+        <div class="drive-buttons">
+          <button class="sync-btn" onclick="syncToDrive()">Driveに保存</button>
+          <button class="load-btn" onclick="loadFromDrive()">Driveから読込</button>
+        </div>
+        <div class="drive-sync-status" id="driveSyncStatus"></div>
+      </div>
+    </div>
+    <div class="data-actions">
+      <button class="export-btn" onclick="exportJSON()">JSONエクスポート</button>
+      <button class="import-btn" onclick="document.getElementById('importFile').click()">JSONインポート</button>
+      <input type="file" id="importFile" accept=".json" style="display:none" onchange="importJSON(event)">
+    </div>
+    <div id="listContent"></div>
+  </div>
+
+  <!-- ===== TIMELINE VIEW ===== -->
+  <div class="view" id="view-timeline">
+    <div class="detail-back" onclick="switchTab('list')">← 一覧に戻る</div>
+    <div id="timelineContent"></div>
+  </div>
+
+  <!-- ===== DETAIL VIEW ===== -->
+  <div class="view" id="view-detail">
+    <div class="detail-back" onclick="switchTab('list')">← 一覧に戻る</div>
+    <div id="detailContent"></div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// DATA DEFINITIONS
+// ============================================================
+
+const MODULES = {
+  bigfive: {
+    id:'bigfive', name:'ビッグファイブ', desc:'性格の5因子（基盤）', color:'#5b6abf', bg:'#eef0ff',
+    count:20, selected:true
+  },
+  dark: {
+    id:'dark', name:'ダークトライアド', desc:'裏の適性・権力性', color:'#7c3aed', bg:'#f3eeff',
+    count:12, selected:true
+  },
+  types: {
+    id:'types', name:'4タイプ', desc:'コミュニケーションスタイル', color:'#0891b2', bg:'#ecfeff',
+    count:12, selected:true
+  },
+  entre: {
+    id:'entre', name:'起業家適性', desc:'ビジネスの行動特性', color:'#d97706', bg:'#fffbeb',
+    count:12, selected:true
+  },
+  capital: {
+    id:'capital', name:'資本論', desc:'目標達成の6つのリソース', color:'#059669', bg:'#ecfdf5',
+    count:12, selected:true
+  }
+};
+
+const QUESTIONS = {
+  bigfive: [
+    {text:"人の集まりや社交の場で活き活きしている",hint:"飲み会やイベントでの様子",trait:"E",r:false},
+    {text:"控えめで静かな印象がある",hint:"普段の話し方やテンション",trait:"E",r:true},
+    {text:"自分から話しかけたり会話をリードする",hint:"グループでの立ち位置",trait:"E",r:false},
+    {text:"一人で過ごす時間のほうが好きそうだ",hint:"休日の過ごし方・SNS投稿",trait:"E",r:true},
+    {text:"他人に対して温かく親切に接している",hint:"店員や後輩への態度",trait:"A",r:false},
+    {text:"他人と衝突したり口論になることが多い",hint:"意見対立時の振る舞い",trait:"A",r:true},
+    {text:"困っている人を見かけたら助けようとする",hint:"実際にそういう場面を見たか",trait:"A",r:false},
+    {text:"自分の利益を最優先にしているように見える",hint:"利害関係がある場面での選択",trait:"A",r:true},
+    {text:"物事をきちんと計画してから行動する",hint:"仕事やプロジェクトの進め方",trait:"C",r:false},
+    {text:"だらしないところや雑なところがある",hint:"デスク周り、時間、約束",trait:"C",r:true},
+    {text:"始めたことは最後までやり遂げるタイプだ",hint:"途中で投げ出すことはあるか",trait:"C",r:false},
+    {text:"目の前の楽しさに流されやすいと感じる",hint:"衝動買い・先延ばし傾向",trait:"C",r:true},
+    {text:"ストレスやプレッシャーに弱そうだ",hint:"トラブル時の反応",trait:"N",r:false},
+    {text:"いつも落ち着いていて動じない印象がある",hint:"予想外の事態でのリアクション",trait:"N",r:true},
+    {text:"不安や心配事を抱えやすいタイプに見える",hint:"将来や些細なことへの反応",trait:"N",r:false},
+    {text:"感情の波が少なくいつもフラットだ",hint:"テンションの上下幅",trait:"N",r:true},
+    {text:"新しいことや未知の経験に興味津々だ",hint:"新しい食べ物・場所・趣味への反応",trait:"O",r:false},
+    {text:"決まったルーティンや慣れたやり方を好む",hint:"変化を嫌がるか、同じ選択をするか",trait:"O",r:true},
+    {text:"独創的なアイデアや視点を持っている",hint:"「この発想はなかった」と思ったか",trait:"O",r:false},
+    {text:"現実的で地に足がついた考え方をする",hint:"空想的 vs 実務的",trait:"O",r:true},
+  ],
+  dark: [
+    {text:"目的のためなら手段を選ばないところがある",hint:"交渉や駆け引きの場面",trait:"Mach",r:false},
+    {text:"他人を操作したり利用するのがうまい",hint:"人間関係の構築パターン",trait:"Mach",r:false},
+    {text:"本音と建前を巧みに使い分ける",hint:"相手によって態度を変えるか",trait:"Mach",r:false},
+    {text:"長期的な戦略を持って人間関係を構築している",hint:"人付き合いに計算が見えるか",trait:"Mach",r:false},
+    {text:"自分が特別な存在だと思っている節がある",hint:"自己評価の高さ",trait:"Narc",r:false},
+    {text:"注目されたい・認められたいという欲求が強い",hint:"SNSや会話での承認欲求",trait:"Narc",r:false},
+    {text:"批判に対して過剰に反応する",hint:"指摘された時のリアクション",trait:"Narc",r:false},
+    {text:"自分の功績をアピールするのが得意だ",hint:"実績の語り方",trait:"Narc",r:false},
+    {text:"他人の痛みや苦しみに無関心に見える",hint:"誰かが困っている時の反応",trait:"Psych",r:false},
+    {text:"後悔や罪悪感をあまり感じないタイプだ",hint:"失敗やミスの後の態度",trait:"Psych",r:false},
+    {text:"スリルや刺激を求める傾向がある",hint:"リスクのある行動への態度",trait:"Psych",r:false},
+    {text:"ルールや社会的規範を軽視するところがある",hint:"決まりごとへの態度",trait:"Psych",r:false},
+  ],
+  types: [
+    {text:"物事の主導権を握りたがるタイプだ",hint:"会議やプロジェクトでの立ち位置",trait:"Controller",r:false},
+    {text:"過程より結果を重視する",hint:"仕事の評価基準",trait:"Controller",r:false},
+    {text:"人に指図されるのを嫌がる",hint:"上司や先輩との関係性",trait:"Controller",r:false},
+    {text:"新しいアイデアで人を巻き込むのが得意",hint:"企画や提案の場面",trait:"Promoter",r:false},
+    {text:"楽観的で「なんとかなる」と考える",hint:"困難に直面した時の態度",trait:"Promoter",r:false},
+    {text:"注目を浴びるのが好きで場を盛り上げる",hint:"飲み会やイベントでの振る舞い",trait:"Promoter",r:false},
+    {text:"人のサポートや裏方に回ることが多い",hint:"チームでの役割",trait:"Supporter",r:false},
+    {text:"和を大切にして対立を避ける傾向がある",hint:"意見の食い違い時の対応",trait:"Supporter",r:false},
+    {text:"自分の意見より相手の気持ちを優先する",hint:"決定を迫られた時の判断基準",trait:"Supporter",r:false},
+    {text:"データや根拠に基づいて判断する",hint:"意思決定のプロセス",trait:"Analyzer",r:false},
+    {text:"慎重で石橋を叩いて渡るタイプだ",hint:"新しいことへの取り組み方",trait:"Analyzer",r:false},
+    {text:"細部にこだわりがあり品質にうるさい",hint:"成果物のチェックの仕方",trait:"Analyzer",r:false},
+  ],
+  entre: [
+    {text:"失敗を恐れずに新しいことに挑戦する",hint:"未経験のことへの態度",trait:"Risk",r:false},
+    {text:"安定を捨てて可能性に賭けるタイプだ",hint:"キャリアや人生の選択",trait:"Risk",r:false},
+    {text:"リスクを避けて安全策を取る傾向がある",hint:"投資やビジネス判断",trait:"Risk",r:true},
+    {text:"長期目標に向けてコツコツ努力できる",hint:"目標設定と行動の一貫性",trait:"Grit",r:false},
+    {text:"壁にぶつかっても簡単には諦めない",hint:"困難な状況での粘り",trait:"Grit",r:false},
+    {text:"飽きっぽくて続かないことが多い",hint:"趣味や仕事の継続性",trait:"Grit",r:true},
+    {text:"「自分ならできる」という自信がある",hint:"チャレンジする時の姿勢",trait:"Efficacy",r:false},
+    {text:"難しい課題でも前向きに取り組む",hint:"難題を振られた時の反応",trait:"Efficacy",r:false},
+    {text:"失敗すると自信をなくしやすい",hint:"挫折後の立ち直り",trait:"Efficacy",r:true},
+    {text:"完璧を待たずにまず始める",hint:"準備 vs 行動のバランス",trait:"Action",r:false},
+    {text:"チャンスを見つけたらすぐ飛びつく",hint:"機会に対する反応速度",trait:"Action",r:false},
+    {text:"準備が整うまでなかなか動き出さない",hint:"新しいプロジェクトの始め方",trait:"Action",r:true},
+  ],
+  capital: [
+    {text:"経済的に余裕がありそうで、お金の心配をしていない",hint:"生活水準・消費行動・お金の話題への反応",trait:"Fin",r:false},
+    {text:"投資や資産形成に積極的に取り組んでいる",hint:"資産運用・副業・収入源の多さ",trait:"Fin",r:false},
+    {text:"自分で稼ぐ力があり、どこでもやっていけそうだ",hint:"転職・独立しても食っていける感",trait:"Human",r:false},
+    {text:"市場価値の高いスキルや実績を持っている",hint:"専門性・キャリア・人から求められる度合い",trait:"Human",r:false},
+    {text:"人脈が広く、困った時に頼れる人が多そうだ",hint:"交友関係の広さ・深さ",trait:"Social",r:false},
+    {text:"周囲から信頼されていて、人望がある",hint:"人からの評判・紹介される頻度",trait:"Social",r:false},
+    {text:"健康的でエネルギッシュに活動している",hint:"体力・活力・生活習慣",trait:"Body",r:false},
+    {text:"体調を崩しやすかったり、疲れやすそうだ",hint:"欠勤・体調不良の頻度・スタミナ",trait:"Body",r:true},
+    {text:"メンタルが強く、逆境でも折れずに前に進める",hint:"困難時の立ち直り・打たれ強さ",trait:"Mental",r:false},
+    {text:"ストレスに弱く、精神的に不安定になりやすい",hint:"プレッシャー下の様子・メンタル不調",trait:"Mental",r:true},
+    {text:"幅広い知識を持っていて、常に学び続けている",hint:"読書・勉強・情報収集の習慣",trait:"Intellect",r:false},
+    {text:"専門分野で深い知見があり、人に教えられるレベルだ",hint:"周囲から相談される頻度・専門性の深さ",trait:"Intellect",r:false},
+  ]
+};
+
+const BF_TRAITS = {
+  E:{name:"外向性",en:"Extraversion",low:"内向性",lowEn:"Introversion",color:"#5b6abf",colorLow:"#e07a5f",bg:"#eef0ff",
+    facets:{high:["社交的","活動的","自己主張","ポジティブ"],low:["内省的","静かさを好む","控えめ","一人の時間"]}},
+  A:{name:"協調性",en:"Agreeableness",low:"冷酷性",lowEn:"Antagonism",color:"#3d9b8f",colorLow:"#c0392b",bg:"#e8f6f3",
+    facets:{high:["信頼","利他的","従順","優しさ"],low:["懐疑的","自己中心的","反抗的","冷淡"]}},
+  C:{name:"誠実性",en:"Conscientiousness",low:"怠惰性",lowEn:"Carelessness",color:"#2e86ab",colorLow:"#d68c45",bg:"#e6f2f8",
+    facets:{high:["自己規律","計画性","責任感","達成志向"],low:["衝動的","無計画","不注意","柔軟すぎる"]}},
+  N:{name:"神経症的傾向",en:"Neuroticism",low:"情緒安定性",lowEn:"Emotional Stability",color:"#c97b2a",colorLow:"#27ae60",bg:"#fdf5e6",
+    facets:{high:["不安","怒りっぽい","憂うつ","自意識過剰"],low:["冷静","ストレス耐性","安定","自信"]}},
+  O:{name:"開放性",en:"Openness",low:"閉鎖性",lowEn:"Closed-mindedness",color:"#8b5cf6",colorLow:"#7f8c8d",bg:"#f3eeff",
+    facets:{high:["好奇心","想像力","芸術的感性","知的探求"],low:["保守的","実務的","慣習重視","変化嫌い"]}}
+};
+const BF_ORDER = ["E","A","C","N","O"];
+
+const DARK_TRAITS = {
+  Mach:{name:"マキャベリズム",en:"Machiavellianism",color:"#7c3aed",bg:"#f3eeff",
+    biz:"戦略的思考・根回し・長期的人脈構築",shadow:"他人を道具として利用・信頼関係の欠如"},
+  Narc:{name:"ナルシシズム",en:"Narcissism",color:"#ec4899",bg:"#fdf2f8",
+    biz:"自信・リーダーシップ・カリスマ性",shadow:"共感力不足・批判への脆弱性・搾取的"},
+  Psych:{name:"サイコパシー",en:"Psychopathy",color:"#475569",bg:"#f1f5f9",
+    biz:"冷静な意思決定・大胆な行動・プレッシャー耐性",shadow:"良心の欠如・衝動的・反社会的行動"}
+};
+const DARK_ORDER = ["Mach","Narc","Psych"];
+
+const TYPE_TRAITS = {
+  Controller:{name:"コントローラー",color:"#dc2626",bg:"#fef2f2",desc:"結果重視・主導的・効率追求。指示されるのを嫌い、自分で決めたい。話は結論から。",comm:"結論から伝える。選択肢を提示して選ばせる。時間を奪わない。"},
+  Promoter:{name:"プロモーター",color:"#ea580c",bg:"#fff7ed",desc:"楽観的・巻き込み上手・ビジョン型。細かいことより大きな絵を描く。ノリと勢い。",comm:"ワクワクする未来を語る。細かい話は後回し。褒めてノセる。"},
+  Supporter:{name:"サポーター",color:"#16a34a",bg:"#f0fdf4",desc:"協力的・共感的・和を重んじる。人の役に立つことに喜びを感じる。対立を避ける。",comm:"安心感を与える。感謝を伝える。急かさない。意見を丁寧に聞く。"},
+  Analyzer:{name:"アナライザー",color:"#2563eb",bg:"#eff6ff",desc:"分析的・慎重・完璧主義。データと根拠で判断する。正確さにこだわる。",comm:"根拠とデータを示す。考える時間を与える。曖昧な指示を避ける。"}
+};
+const TYPE_ORDER = ["Controller","Promoter","Supporter","Analyzer"];
+
+const ENTRE_TRAITS = {
+  Risk:{name:"リスク許容度",color:"#dc2626",bg:"#fef2f2"},
+  Grit:{name:"グリット（やり抜く力）",color:"#d97706",bg:"#fffbeb"},
+  Efficacy:{name:"自己効力感",color:"#16a34a",bg:"#f0fdf4"},
+  Action:{name:"行動バイアス",color:"#2563eb",bg:"#eff6ff"}
+};
+const ENTRE_ORDER = ["Risk","Grit","Efficacy","Action"];
+
+const CAPITAL_TRAITS = {
+  Fin:{name:"金融資本",en:"Financial Capital",color:"#ca8a04",bg:"#fefce8",icon:"💰",desc:"お金・資産・経済的基盤"},
+  Human:{name:"人的資本",en:"Human Capital",color:"#d97706",bg:"#fffbeb",icon:"⚡",desc:"稼ぐ力・キャリア・市場価値"},
+  Social:{name:"社会資本",en:"Social Capital",color:"#0891b2",bg:"#ecfeff",icon:"🤝",desc:"人脈・信頼・コミュニティ"},
+  Body:{name:"身体資本",en:"Physical Capital",color:"#dc2626",bg:"#fef2f2",icon:"💪",desc:"健康・体力・若さ"},
+  Mental:{name:"精神資本",en:"Mental Capital",color:"#7c3aed",bg:"#f3eeff",icon:"🧠",desc:"メンタルの強さ・レジリエンス"},
+  Intellect:{name:"知識資本",en:"Intellectual Capital",color:"#2563eb",bg:"#eff6ff",icon:"📚",desc:"専門知識・学習力・知的好奇心"}
+};
+const CAPITAL_ORDER = ["Fin","Human","Social","Body","Mental","Intellect"];
+
+// ============================================================
+// STATE
+// ============================================================
+let answers = {};
+let activeModules = [];
+let allQuestions = [];
+let currentPage = 0;
+let lastScores = null;
+let lastTargetName = '';
+const QS_PER_PAGE = 4;
+const STORAGE_KEY = 'personality_observer_v2';
+
+// ============================================================
+// TABS
+// ============================================================
+function switchTab(tab) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.getElementById('view-'+tab).classList.add('active');
+  if (tab==='list') renderList();
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+// ============================================================
+// MODULE SELECTION
+// ============================================================
+function renderModuleGrid() {
+  const grid = document.getElementById('moduleGrid');
+  grid.innerHTML = Object.values(MODULES).map(m => `
+    <div class="module-card ${m.selected?'selected':''}" onclick="toggleModule('${m.id}')" style="${m.selected?'border-color:'+m.color+';background:'+m.bg:''}">
+      <div class="module-check" style="${m.selected?'background:'+m.color+';border-color:'+m.color:''}">
+        ${m.selected?'✓':''}
+      </div>
+      <div class="module-info">
+        <div class="name" style="color:${m.color}">${m.name}</div>
+        <div class="desc">${m.desc}</div>
+        <div class="count" style="color:${m.color}">${m.count}問</div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function toggleModule(id) {
+  MODULES[id].selected = !MODULES[id].selected;
+  renderModuleGrid();
+}
+
+// ============================================================
+// START ASSESSMENT
+// ============================================================
+function startAssessment() {
+  activeModules = Object.values(MODULES).filter(m => m.selected).map(m => m.id);
+  if (activeModules.length === 0) { alert('少なくとも1つ選択してください'); return; }
+
+  // Build question list
+  allQuestions = [];
+  activeModules.forEach(mid => {
+    QUESTIONS[mid].forEach((q, i) => {
+      allQuestions.push({...q, module: mid, originalIndex: i});
+    });
+  });
+
+  answers = {};
+  currentPage = 0;
+
+  document.getElementById('setupPhase').style.display = 'none';
+  document.getElementById('questionPhase').style.display = 'block';
+  renderQuestions();
+}
+
+// ============================================================
+// QUESTIONS
+// ============================================================
+function renderQuestions() {
+  const c = document.getElementById('questionnaire');
+  c.innerHTML = '';
+  const start = currentPage * QS_PER_PAGE;
+  const end = Math.min(start + QS_PER_PAGE, allQuestions.length);
+
+  let lastModule = null;
+  for (let i = start; i < end; i++) {
+    const q = allQuestions[i];
+    const mod = MODULES[q.module];
+    if (q.module !== lastModule) {
+      lastModule = q.module;
+      // Check if this is first question of this module in the page
+      const modStart = allQuestions.findIndex(qq => qq.module === q.module);
+      if (i === modStart || start <= modStart) {
+        // Only show header at actual start of module
+      }
+    }
+    const card = document.createElement('div');
+    card.className = 'q-card';
+    card.style.borderLeftColor = mod.color;
+    const tagStyle = `background:${mod.bg};color:${mod.color}`;
+    const chipBg = mod.color;
+    card.innerHTML = `
+      <div class="q-meta">
+        <span class="q-num" style="color:${mod.color}">Q${i+1}/${allQuestions.length}</span>
+        <span class="q-tag" style="${tagStyle}">${mod.name}${q.r?' (R)':''}</span>
+      </div>
+      <div class="q-text">この人は、${q.text}</div>
+      <div class="q-hint">${q.hint}</div>
+      <div class="likert">
+        ${[1,2,3,4,5].map(v => `
+          <label><input type="radio" name="q${i}" value="${v}" ${answers[i]===v?'checked':''} onchange="setAnswer(${i},${v})">
+          <span class="chip" style="${answers[i]===v?'background:'+chipBg+';border-color:'+chipBg:''}">${v}<span class="chip-label">${['全く\nない','あまり\nない','どちら\nとも','やや\nそう','非常に\nそう'][v-1]}</span></span></label>
+        `).join('')}
+      </div>`;
+    c.appendChild(card);
+  }
+  updateNav();
+}
+
+function setAnswer(i, v) { answers[i] = v; updateNav(); }
+
+function updateNav() {
+  const count = Object.keys(answers).length;
+  const total = allQuestions.length;
+  const pct = count / total * 100;
+  document.getElementById('progressFill').style.width = pct + '%';
+  document.getElementById('progressFill').style.background = `linear-gradient(90deg, ${MODULES[activeModules[0]].color}, ${MODULES[activeModules[activeModules.length-1]].color})`;
+  document.getElementById('progressText').textContent = `${count}/${total}`;
+  document.getElementById('prevBtn').disabled = currentPage === 0;
+  const start = currentPage * QS_PER_PAGE;
+  const end = Math.min(start + QS_PER_PAGE, total);
+  const allAnswered = Array.from({length: end-start}, (_,j) => answers[start+j]).every(a => a != null);
+  const isLast = currentPage === Math.ceil(total / QS_PER_PAGE) - 1;
+  const btn = document.getElementById('nextBtn');
+  btn.disabled = !allAnswered;
+  btn.textContent = isLast ? '結果を見る' : '次へ';
+}
+
+function changePage(dir) {
+  const totalPages = Math.ceil(allQuestions.length / QS_PER_PAGE);
+  if (dir > 0 && currentPage === totalPages - 1) { showResults(); return; }
+  currentPage += dir;
+  renderQuestions();
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+// ============================================================
+// SCORING
+// ============================================================
+function calcAllScores(ans) {
+  ans = ans || answers;
+  const result = {};
+
+  if (activeModules.includes('bigfive')) {
+    result.bigfive = {};
+    BF_ORDER.forEach(t => { result.bigfive[t] = {items:[], total:0, avg:0, avgR:0}; });
+    allQuestions.forEach((q, i) => {
+      if (q.module !== 'bigfive') return;
+      const raw = ans[i], eff = q.r ? (6-raw) : raw;
+      result.bigfive[q.trait].items.push({idx:i, text:q.text, raw, eff, r:q.r});
+    });
+    BF_ORDER.forEach(t => {
+      const s = result.bigfive[t];
+      s.total = s.items.reduce((a,b) => a+b.eff, 0);
+      s.avg = s.total / s.items.length;
+      s.avgR = 6 - s.avg;
+    });
+  }
+
+  if (activeModules.includes('dark')) {
+    result.dark = {};
+    DARK_ORDER.forEach(t => { result.dark[t] = {items:[], total:0, avg:0}; });
+    allQuestions.forEach((q, i) => {
+      if (q.module !== 'dark') return;
+      result.dark[q.trait].items.push({idx:i, text:q.text, raw:ans[i]});
+    });
+    DARK_ORDER.forEach(t => {
+      const s = result.dark[t];
+      s.total = s.items.reduce((a,b) => a+b.raw, 0);
+      s.avg = s.total / s.items.length;
+    });
+  }
+
+  if (activeModules.includes('types')) {
+    result.types = {};
+    TYPE_ORDER.forEach(t => { result.types[t] = {items:[], total:0, avg:0}; });
+    allQuestions.forEach((q, i) => {
+      if (q.module !== 'types') return;
+      result.types[q.trait].items.push({idx:i, text:q.text, raw:ans[i]});
+    });
+    TYPE_ORDER.forEach(t => {
+      const s = result.types[t];
+      s.total = s.items.reduce((a,b) => a+b.raw, 0);
+      s.avg = s.total / s.items.length;
+    });
+  }
+
+  if (activeModules.includes('entre')) {
+    result.entre = {};
+    ENTRE_ORDER.forEach(t => { result.entre[t] = {items:[], total:0, avg:0}; });
+    allQuestions.forEach((q, i) => {
+      if (q.module !== 'entre') return;
+      const raw = ans[i], eff = q.r ? (6-raw) : raw;
+      result.entre[q.trait].items.push({idx:i, text:q.text, raw, eff, r:q.r});
+    });
+    ENTRE_ORDER.forEach(t => {
+      const s = result.entre[t];
+      s.total = s.items.reduce((a,b) => a+b.eff, 0);
+      s.avg = s.total / s.items.length;
+    });
+  }
+
+  if (activeModules.includes('capital')) {
+    result.capital = {};
+    CAPITAL_ORDER.forEach(t => { result.capital[t] = {items:[], total:0, avg:0}; });
+    allQuestions.forEach((q, i) => {
+      if (q.module !== 'capital') return;
+      const raw = ans[i], eff = q.r ? (6-raw) : raw;
+      result.capital[q.trait].items.push({idx:i, text:q.text, raw, eff, r:q.r});
+    });
+    CAPITAL_ORDER.forEach(t => {
+      const s = result.capital[t];
+      s.total = s.items.reduce((a,b) => a+b.eff, 0);
+      s.avg = s.total / s.items.length;
+    });
+  }
+
+  return result;
+}
+
+// ============================================================
+// SHOW RESULTS
+// ============================================================
+function showResults() {
+  document.getElementById('questionPhase').style.display = 'none';
+  document.getElementById('resultPhase').style.display = 'block';
+
+  lastTargetName = document.getElementById('targetName').value.trim() || '対象者';
+  document.getElementById('resultTitle').textContent = lastTargetName + ' の予測結果';
+  document.getElementById('resultDate').textContent = new Date().toLocaleDateString('ja-JP');
+
+  lastScores = calcAllScores();
+  renderAllResults(lastScores, lastTargetName, 'resultContent');
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+function renderAllResults(scores, name, containerId) {
+  const c = document.getElementById(containerId);
+  c.innerHTML = '';
+
+  // Big Five
+  if (scores.bigfive) {
+    c.innerHTML += `<div class="section-title"><span class="dot" style="background:#5b6abf"></span>ビッグファイブ（性格の基盤）</div>`;
+    c.innerHTML += `<div class="radar-section"><h3>全体マップ</h3><canvas id="radar_${containerId}" width="360" height="360"></canvas>
+      <div class="legend"><span><span class="legend-dot" style="background:#5b6abf"></span>正位相</span><span><span class="legend-dot" style="background:#e74c3c"></span>逆位相</span></div></div>`;
+    BF_ORDER.forEach(t => { c.innerHTML += renderBFCard(scores.bigfive[t], BF_TRAITS[t]); });
+    setTimeout(() => drawRadar(scores.bigfive, 'radar_'+containerId), 50);
+  }
+
+  // Dark Triad
+  if (scores.dark) {
+    c.innerHTML += `<div class="section-title"><span class="dot" style="background:#7c3aed"></span>ダークトライアド（裏の適性）</div>`;
+    const darkTotal = DARK_ORDER.reduce((a,t) => a + scores.dark[t].avg, 0) / 3;
+    c.innerHTML += `<div class="card" style="text-align:center;font-size:.82em;color:var(--text-muted)">ダークトライアド総合: <b style="color:#7c3aed">${darkTotal.toFixed(2)}</b> / 5.00<br><span style="font-size:.85em">${darkTotal>=3.5?'かなり高め — 戦略的だが要注意':darkTotal>=2.5?'中程度 — バランス型':'低め — 素直で協調的'}</span></div>`;
+    DARK_ORDER.forEach(t => { c.innerHTML += renderDarkCard(scores.dark[t], DARK_TRAITS[t]); });
+  }
+
+  // 4 Types
+  if (scores.types) {
+    c.innerHTML += `<div class="section-title"><span class="dot" style="background:#0891b2"></span>4タイプ（コミュニケーションスタイル）</div>`;
+    const sorted = [...TYPE_ORDER].sort((a,b) => scores.types[b].avg - scores.types[a].avg);
+    const primary = sorted[0], secondary = sorted[1];
+    const pt = TYPE_TRAITS[primary], st = TYPE_TRAITS[secondary];
+    c.innerHTML += `<div class="type-highlight" style="background:${pt.bg};border:2px solid ${pt.color}">
+      <div class="label" style="color:${pt.color}">メインタイプ</div>
+      <div class="primary" style="color:${pt.color}">${pt.name}</div>
+      <div class="sub">サブ: <b style="color:${st.color}">${st.name}</b></div>
+    </div>`;
+    c.innerHTML += `<div class="card" style="font-size:.82em"><b style="color:${pt.color}">${pt.name}の特徴：</b><br>${pt.desc}<br><br><b>接し方のコツ：</b><br>${pt.comm}</div>`;
+    TYPE_ORDER.forEach(t => { c.innerHTML += renderTypeCard(scores.types[t], TYPE_TRAITS[t], t===primary); });
+  }
+
+  // Entrepreneurial
+  if (scores.entre) {
+    c.innerHTML += `<div class="section-title"><span class="dot" style="background:#d97706"></span>起業家適性（ビジネス行動特性）</div>`;
+    const entreAvg = ENTRE_ORDER.reduce((a,t) => a + scores.entre[t].avg, 0) / 4;
+    c.innerHTML += `<div class="card" style="text-align:center;font-size:.82em">起業家適性スコア: <b style="color:#d97706">${entreAvg.toFixed(2)}</b> / 5.00<br><span style="font-size:.85em;color:var(--text-muted)">${entreAvg>=4?'非常に高い起業家マインド':entreAvg>=3.5?'起業家気質あり':entreAvg>=2.5?'バランス型 — 環境次第':entreAvg>=2?'安定志向が強め':'起業より雇用向き'}</span></div>`;
+    ENTRE_ORDER.forEach(t => { c.innerHTML += renderEntreCard(scores.entre[t], ENTRE_TRAITS[t]); });
+  }
+
+  // Capital
+  if (scores.capital) {
+    c.innerHTML += `<div class="section-title"><span class="dot" style="background:#059669"></span>資本論（目標達成のリソース）</div>`;
+    // Resource map - which capitals are strong (>=3.5)
+    const strong = CAPITAL_ORDER.filter(t => scores.capital[t].avg >= 3.5);
+    const weak = CAPITAL_ORDER.filter(t => scores.capital[t].avg < 2.5);
+    const mid = CAPITAL_ORDER.filter(t => scores.capital[t].avg >= 2.5 && scores.capital[t].avg < 3.5);
+    let mapHtml = `<div class="card"><div style="font-size:.88em;font-weight:700;margin-bottom:10px;color:#059669">リソースマップ</div>`;
+    mapHtml += `<div style="font-size:.78em;color:var(--text-muted);margin-bottom:8px">※ 2つ以上の資本を組み合わせることで目標達成の可能性が高まる</div>`;
+    if (strong.length) mapHtml += `<div style="margin-bottom:6px"><b style="color:var(--success);font-size:.82em">強い資本（3.5+）：</b><span style="font-size:.82em">${strong.map(t=>CAPITAL_TRAITS[t].icon+CAPITAL_TRAITS[t].name).join('、')}</span></div>`;
+    if (mid.length) mapHtml += `<div style="margin-bottom:6px"><b style="color:var(--text-muted);font-size:.82em">普通（2.5〜3.4）：</b><span style="font-size:.82em">${mid.map(t=>CAPITAL_TRAITS[t].icon+CAPITAL_TRAITS[t].name).join('、')}</span></div>`;
+    if (weak.length) mapHtml += `<div style="margin-bottom:6px"><b style="color:var(--danger);font-size:.82em">要強化（〜2.4）：</b><span style="font-size:.82em">${weak.map(t=>CAPITAL_TRAITS[t].icon+CAPITAL_TRAITS[t].name).join('、')}</span></div>`;
+    if (strong.length >= 2) {
+      mapHtml += `<div style="margin-top:10px;padding:10px;background:var(--success-bg);border-radius:10px;font-size:.8em;color:#166534"><b>活用可能な組み合わせ：</b> ${strong.map(t=>CAPITAL_TRAITS[t].name).join(' × ')} → これらを掛け合わせて目標達成に活かせる</div>`;
+    } else if (strong.length === 1) {
+      mapHtml += `<div style="margin-top:10px;padding:10px;background:#fffbeb;border-radius:10px;font-size:.8em;color:#92400e"><b>惜しい：</b> ${CAPITAL_TRAITS[strong[0]].name}は強いが、もう1つ資本を伸ばせると大きく変わる可能性あり</div>`;
+    } else {
+      mapHtml += `<div style="margin-top:10px;padding:10px;background:var(--danger-bg);border-radius:10px;font-size:.8em;color:#991b1b"><b>課題：</b> 突出した資本がまだない。まず1つの資本を集中的に育てることが先決</div>`;
+    }
+    mapHtml += `</div>`;
+    c.innerHTML += mapHtml;
+    CAPITAL_ORDER.forEach(t => { c.innerHTML += renderCapitalCard(scores.capital[t], CAPITAL_TRAITS[t]); });
+  }
+
+  // Summary
+  c.innerHTML += renderCombinedSummary(scores, name);
+}
+
+// ---- Render helpers ----
+function renderBFCard(s, tr) {
+  const pct = s.avg/5*100, pctR = s.avgR/5*100;
+  return `<div class="trait-card">
+    <div class="trait-title-row">
+      <span class="trait-name" style="color:${tr.color}">${tr.name}（${tr.en}）</span>
+      <span class="trait-badge" style="background:${tr.bg};color:${tr.color}">${s.avg.toFixed(2)}</span>
+    </div>
+    <div class="bar-row"><div class="bar-label" style="color:${tr.color}">${tr.name}</div><div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${tr.color}">${s.avg.toFixed(2)}</div></div><div class="bar-value" style="color:${tr.color}">${pct.toFixed(0)}%</div></div>
+    <div class="bar-row"><div class="bar-label" style="color:${tr.colorLow}">${tr.low}</div><div class="bar-track"><div class="bar-fill" style="width:${pctR}%;background:${tr.colorLow}">${s.avgR.toFixed(2)}</div></div><div class="bar-value" style="color:${tr.colorLow}">${pctR.toFixed(0)}%</div></div>
+    <div class="spectrum"><span class="spectrum-label" style="color:${tr.colorLow}">${tr.low}</span><div class="spectrum-track" style="background:linear-gradient(90deg,${tr.colorLow}33,${tr.color}33)"><div class="spectrum-marker" style="left:${pct}%;background:${tr.color}"></div></div><span class="spectrum-label" style="color:${tr.color}">${tr.name}</span></div>
+    <div class="facets-info"><b>高：</b>${tr.facets.high.join('、')}<br><b>低：</b>${tr.facets.low.join('、')}</div>
+    <div class="calc-toggle" onclick="toggleCalc(this)">▶ 計算の内訳</div>
+    <div class="calc-detail">
+      ${s.items.map(it => `<div class="calc-row ${it.r?'reverse':''}"><span>${it.text.substring(0,22)}…</span><span class="calc-formula">${it.r?it.raw+'→(6-'+it.raw+')=<b>'+it.eff+'</b>':it.raw+'→<b>'+it.eff+'</b>'}</span></div>`).join('')}
+      <div class="calc-row total"><span>合計</span><span>${s.items.map(it=>it.eff).join('+')}=${s.total}</span></div>
+      <div class="calc-row total"><span>平均</span><span>${s.total}÷${s.items.length}=<b>${s.avg.toFixed(2)}</b></span></div>
+      <div class="calc-row total"><span>逆位相</span><span>6-${s.avg.toFixed(2)}=<b>${s.avgR.toFixed(2)}</b></span></div>
+    </div>
+  </div>`;
+}
+
+function renderDarkCard(s, tr) {
+  const pct = s.avg/5*100;
+  return `<div class="trait-card">
+    <div class="trait-title-row">
+      <span class="trait-name" style="color:${tr.color}">${tr.name}（${tr.en}）</span>
+      <span class="trait-badge" style="background:${tr.bg};color:${tr.color}">${s.avg.toFixed(2)}</span>
+    </div>
+    <div class="bar-row"><div class="bar-label" style="color:${tr.color}">スコア</div><div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${tr.color}">${s.avg.toFixed(2)}</div></div><div class="bar-value">${pct.toFixed(0)}%</div></div>
+    <div class="interp">
+      <div class="biz"><b>ビジネス面</b>${tr.biz}</div>
+      <div class="shadow"><b>シャドウ面</b>${tr.shadow}</div>
+    </div>
+    <div class="calc-toggle" onclick="toggleCalc(this)">▶ 内訳</div>
+    <div class="calc-detail">
+      ${s.items.map(it => `<div class="calc-row"><span>${it.text.substring(0,22)}…</span><span class="calc-formula">${it.raw}</span></div>`).join('')}
+      <div class="calc-row total"><span>平均</span><span>${s.total}÷${s.items.length}=<b>${s.avg.toFixed(2)}</b></span></div>
+    </div>
+  </div>`;
+}
+
+function renderTypeCard(s, tr, isPrimary) {
+  const pct = s.avg/5*100;
+  return `<div class="trait-card" style="${isPrimary?'border:2px solid '+tr.color:''}">
+    <div class="trait-title-row">
+      <span class="trait-name" style="color:${tr.color}">${tr.name}${isPrimary?' ★':''}</span>
+      <span class="trait-badge" style="background:${tr.bg};color:${tr.color}">${s.avg.toFixed(2)}</span>
+    </div>
+    <div class="bar-row"><div class="bar-label" style="color:${tr.color}">スコア</div><div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${tr.color}">${s.avg.toFixed(2)}</div></div><div class="bar-value">${pct.toFixed(0)}%</div></div>
+  </div>`;
+}
+
+function renderEntreCard(s, tr) {
+  const pct = s.avg/5*100;
+  return `<div class="trait-card">
+    <div class="trait-title-row">
+      <span class="trait-name" style="color:${tr.color}">${tr.name}</span>
+      <span class="trait-badge" style="background:${tr.bg};color:${tr.color}">${s.avg.toFixed(2)}</span>
+    </div>
+    <div class="bar-row"><div class="bar-label" style="color:${tr.color}">スコア</div><div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${tr.color}">${s.avg.toFixed(2)}</div></div><div class="bar-value">${pct.toFixed(0)}%</div></div>
+    <div class="calc-toggle" onclick="toggleCalc(this)">▶ 内訳</div>
+    <div class="calc-detail">
+      ${s.items.map(it => `<div class="calc-row ${it.r?'reverse':''}"><span>${it.text.substring(0,22)}…</span><span class="calc-formula">${it.r?it.raw+'→(6-'+it.raw+')=<b>'+it.eff+'</b>':it.raw+'→<b>'+it.eff+'</b>'}</span></div>`).join('')}
+      <div class="calc-row total"><span>平均</span><span>${s.total}÷${s.items.length}=<b>${s.avg.toFixed(2)}</b></span></div>
+    </div>
+  </div>`;
+}
+
+function renderCapitalCard(s, tr) {
+  const pct = s.avg/5*100;
+  const level = s.avg >= 4 ? '非常に豊か' : s.avg >= 3.5 ? '豊か' : s.avg >= 2.5 ? '普通' : s.avg >= 1.5 ? '不足気味' : '要強化';
+  const levelColor = s.avg >= 3.5 ? 'var(--success)' : s.avg >= 2.5 ? 'var(--text-muted)' : 'var(--danger)';
+  return `<div class="trait-card">
+    <div class="trait-title-row">
+      <span class="trait-name" style="color:${tr.color}">${tr.icon} ${tr.name}（${tr.en}）</span>
+      <span class="trait-badge" style="background:${tr.bg};color:${tr.color}">${s.avg.toFixed(2)}</span>
+    </div>
+    <div style="font-size:.72em;color:var(--text-muted);margin-bottom:8px">${tr.desc}</div>
+    <div class="bar-row"><div class="bar-label" style="color:${tr.color}">スコア</div><div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${tr.color}">${s.avg.toFixed(2)}</div></div><div class="bar-value" style="color:${levelColor};font-size:.68em">${level}</div></div>
+    <div class="calc-toggle" onclick="toggleCalc(this)">▶ 内訳</div>
+    <div class="calc-detail">
+      ${s.items.map(it => `<div class="calc-row ${it.r?'reverse':''}"><span>${it.text.substring(0,22)}…</span><span class="calc-formula">${it.r?it.raw+'→(6-'+it.raw+')=<b>'+it.eff+'</b>':it.raw+'→<b>'+it.eff+'</b>'}</span></div>`).join('')}
+      <div class="calc-row total"><span>平均</span><span>${s.total}÷${s.items.length}=<b>${s.avg.toFixed(2)}</b></span></div>
+    </div>
+  </div>`;
+}
+
+function renderCombinedSummary(scores, name) {
+  const lines = [`<b>${name}</b> の総合予測：<br>`];
+
+  if (scores.bigfive) {
+    let maxT='E',minT='E';
+    BF_ORDER.forEach(t => {
+      if(scores.bigfive[t].avg>scores.bigfive[maxT].avg) maxT=t;
+      if(scores.bigfive[t].avg<scores.bigfive[minT].avg) minT=t;
+    });
+    lines.push(`<b>性格の軸：</b> ${BF_TRAITS[maxT].name}が最も高く（${scores.bigfive[maxT].avg.toFixed(2)}）、${BF_TRAITS[minT].name}が最も低い（${scores.bigfive[minT].avg.toFixed(2)}）`);
+  }
+  if (scores.dark) {
+    const sorted = [...DARK_ORDER].sort((a,b) => scores.dark[b].avg - scores.dark[a].avg);
+    if (scores.dark[sorted[0]].avg >= 3.5) {
+      lines.push(`<b>注意点：</b> ${DARK_TRAITS[sorted[0]].name}が高め（${scores.dark[sorted[0]].avg.toFixed(2)}）— ${DARK_TRAITS[sorted[0]].shadow}`);
+    }
+  }
+  if (scores.types) {
+    const sorted = [...TYPE_ORDER].sort((a,b) => scores.types[b].avg - scores.types[a].avg);
+    lines.push(`<b>接し方：</b> ${TYPE_TRAITS[sorted[0]].name}タイプ → ${TYPE_TRAITS[sorted[0]].comm}`);
+  }
+  if (scores.entre) {
+    const entreAvg = ENTRE_ORDER.reduce((a,t) => a + scores.entre[t].avg, 0) / 4;
+    const maxE = ENTRE_ORDER.reduce((a,b) => scores.entre[a].avg > scores.entre[b].avg ? a : b);
+    const minE = ENTRE_ORDER.reduce((a,b) => scores.entre[a].avg < scores.entre[b].avg ? a : b);
+    lines.push(`<b>起業家適性：</b> 総合 ${entreAvg.toFixed(2)} — 強み: ${ENTRE_TRAITS[maxE].name}、課題: ${ENTRE_TRAITS[minE].name}`);
+  }
+  if (scores.capital) {
+    const strong = CAPITAL_ORDER.filter(t => scores.capital[t].avg >= 3.5);
+    const maxC = CAPITAL_ORDER.reduce((a,b) => scores.capital[a].avg > scores.capital[b].avg ? a : b);
+    const minC = CAPITAL_ORDER.reduce((a,b) => scores.capital[a].avg < scores.capital[b].avg ? a : b);
+    lines.push(`<b>リソース：</b> 最強は${CAPITAL_TRAITS[maxC].icon}${CAPITAL_TRAITS[maxC].name}（${scores.capital[maxC].avg.toFixed(2)}）、要強化は${CAPITAL_TRAITS[minC].icon}${CAPITAL_TRAITS[minC].name}（${scores.capital[minC].avg.toFixed(2)}）`);
+    if (strong.length >= 2) {
+      lines.push(`<b>組み合わせ：</b> ${strong.map(t=>CAPITAL_TRAITS[t].name).join('×')} で目標達成のリソースあり`);
+    }
+  }
+
+  return `<div class="summary-card"><h3>総合分析</h3><div class="summary-text">${lines.join('<br>')}</div></div>`;
+}
+
+function toggleCalc(el) {
+  const d = el.nextElementSibling;
+  d.classList.toggle('show');
+  el.textContent = d.classList.contains('show') ? '▼ 隠す' : '▶ 計算の内訳';
+}
+
+// ============================================================
+// RADAR CHART (Big Five)
+// ============================================================
+function drawRadar(bfScores, canvasId) {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+  const dpr = window.devicePixelRatio || 1;
+  const cssSize = Math.min(340, window.innerWidth - 50);
+  canvas.style.width = cssSize+'px'; canvas.style.height = cssSize+'px';
+  canvas.width = cssSize*dpr; canvas.height = cssSize*dpr;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr); ctx.clearRect(0,0,cssSize,cssSize);
+  const cx=cssSize/2, cy=cssSize/2, radius=cssSize*.35, n=5;
+  const vals = BF_ORDER.map(t => bfScores[t].avg/5);
+  const valsR = BF_ORDER.map(t => bfScores[t].avgR/5);
+  const labels = BF_ORDER.map(t => BF_TRAITS[t].name);
+
+  for(let lv=1;lv<=5;lv++){ctx.beginPath();for(let i=0;i<=n;i++){const a=(Math.PI*2/n)*i-Math.PI/2,r=radius*lv/5;i===0?ctx.moveTo(cx+r*Math.cos(a),cy+r*Math.sin(a)):ctx.lineTo(cx+r*Math.cos(a),cy+r*Math.sin(a))}ctx.strokeStyle='#ddd';ctx.lineWidth=1;ctx.stroke()}
+  for(let i=0;i<n;i++){const a=(Math.PI*2/n)*i-Math.PI/2;ctx.beginPath();ctx.moveTo(cx,cy);ctx.lineTo(cx+radius*Math.cos(a),cy+radius*Math.sin(a));ctx.strokeStyle='#ddd';ctx.stroke()}
+  ctx.fillStyle='#555';ctx.font=`${Math.max(10,cssSize*.034)}px sans-serif`;ctx.textAlign='center';
+  for(let i=0;i<n;i++){const a=(Math.PI*2/n)*i-Math.PI/2;ctx.fillText(labels[i],cx+(radius+20)*Math.cos(a),cy+(radius+20)*Math.sin(a)+4)}
+
+  // Reverse
+  ctx.beginPath();for(let i=0;i<=n;i++){const idx=i%n,a=(Math.PI*2/n)*idx-Math.PI/2,x=cx+radius*valsR[idx]*Math.cos(a),y=cy+radius*valsR[idx]*Math.sin(a);i===0?ctx.moveTo(x,y):ctx.lineTo(x,y)}ctx.fillStyle='rgba(231,76,60,.08)';ctx.fill();ctx.strokeStyle='#e74c3c';ctx.lineWidth=1.5;ctx.stroke();
+  // Main
+  ctx.beginPath();for(let i=0;i<=n;i++){const idx=i%n,a=(Math.PI*2/n)*idx-Math.PI/2,x=cx+radius*vals[idx]*Math.cos(a),y=cy+radius*vals[idx]*Math.sin(a);i===0?ctx.moveTo(x,y):ctx.lineTo(x,y)}ctx.fillStyle='rgba(91,106,191,.15)';ctx.fill();ctx.strokeStyle='#5b6abf';ctx.lineWidth=2;ctx.stroke();
+  // Dots
+  for(let i=0;i<n;i++){const a=(Math.PI*2/n)*i-Math.PI/2;ctx.beginPath();ctx.arc(cx+radius*vals[i]*Math.cos(a),cy+radius*vals[i]*Math.sin(a),4,0,Math.PI*2);ctx.fillStyle='#5b6abf';ctx.fill();ctx.beginPath();ctx.arc(cx+radius*valsR[i]*Math.cos(a),cy+radius*valsR[i]*Math.sin(a),3,0,Math.PI*2);ctx.fillStyle='#e74c3c';ctx.fill()}
+}
+
+// ============================================================
+// SAVE / LOAD
+// ============================================================
+function getSaved() { try{return JSON.parse(localStorage.getItem(STORAGE_KEY)||'[]')}catch{return[]} }
+function setSaved(d) { localStorage.setItem(STORAGE_KEY, JSON.stringify(d)); updateBadge(); }
+function updateBadge() { const b=document.getElementById('listBadge'),c=getSaved().length; b.style.display=c>0?'':'none'; b.textContent=c; }
+
+function saveResult() {
+  const name = lastTargetName;
+  const entry = {
+    id: Date.now().toString(36)+Math.random().toString(36).substr(2,4),
+    name, date: new Date().toISOString(),
+    modules: [...activeModules],
+    answers: {...answers},
+    scoresCache: {}
+  };
+  // Cache averages for list display
+  if (lastScores.bigfive) { entry.scoresCache.bigfive = {}; BF_ORDER.forEach(t => { entry.scoresCache.bigfive[t] = lastScores.bigfive[t].avg; }); }
+  if (lastScores.dark) { entry.scoresCache.dark = {}; DARK_ORDER.forEach(t => { entry.scoresCache.dark[t] = lastScores.dark[t].avg; }); }
+  if (lastScores.types) { entry.scoresCache.types = {}; TYPE_ORDER.forEach(t => { entry.scoresCache.types[t] = lastScores.types[t].avg; }); }
+  if (lastScores.entre) { entry.scoresCache.entre = {}; ENTRE_ORDER.forEach(t => { entry.scoresCache.entre[t] = lastScores.entre[t].avg; }); }
+  if (lastScores.capital) { entry.scoresCache.capital = {}; CAPITAL_ORDER.forEach(t => { entry.scoresCache.capital[t] = lastScores.capital[t].avg; }); }
+
+  const saved = getSaved(); saved.unshift(entry); setSaved(saved);
+  alert(`${name} の結果を保存しました`);
+  autoSyncToDrive();
+}
+
+function deleteResult(id) { if(!confirm('削除しますか？'))return; setSaved(getSaved().filter(e=>e.id!==id)); renderList(); }
+
+function renderList() {
+  const c = document.getElementById('listContent'), saved = getSaved();
+  updateBadge();
+  if (!saved.length) { c.innerHTML = `<div class="list-empty"><p style="font-size:2em;margin-bottom:10px">📋</p><p>保存された結果はまだありません</p><p style="font-size:.78em;margin-top:4px">診断を完了して「保存する」を押してください</p></div>`; return; }
+
+  // Group by person name
+  const groups = {};
+  saved.forEach(entry => {
+    const key = entry.name.trim().toLowerCase();
+    if (!groups[key]) groups[key] = {name: entry.name, entries: []};
+    groups[key].entries.push(entry);
+  });
+
+  // Sort groups by latest entry date
+  const sortedGroups = Object.values(groups).sort((a,b) =>
+    new Date(b.entries[0].date) - new Date(a.entries[0].date)
+  );
+
+  c.innerHTML = sortedGroups.map(group => {
+    const entries = group.entries.sort((a,b) => new Date(b.date) - new Date(a.date));
+    const hasMultiple = entries.length >= 2;
+    const entryRows = entries.map(entry => {
+      const d = new Date(entry.date);
+      const ds = `${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')}`;
+      let badges = '';
+      if (entry.scoresCache.bigfive) { BF_ORDER.slice(0,3).forEach(t => { badges += `<span class="mini-score" style="background:${BF_TRAITS[t].bg};color:${BF_TRAITS[t].color}">${BF_TRAITS[t].name}${entry.scoresCache.bigfive[t].toFixed(1)}</span>`; }); }
+      if (entry.scoresCache.types) {
+        const sorted = [...TYPE_ORDER].sort((a,b) => entry.scoresCache.types[b] - entry.scoresCache.types[a]);
+        badges += `<span class="mini-score" style="background:${TYPE_TRAITS[sorted[0]].bg};color:${TYPE_TRAITS[sorted[0]].color}">${TYPE_TRAITS[sorted[0]].name}</span>`;
+      }
+      if (entry.scoresCache.capital) {
+        const strong = CAPITAL_ORDER.filter(t => (entry.scoresCache.capital[t]||0) >= 3.5);
+        if (strong.length) badges += `<span class="mini-score" style="background:#ecfdf5;color:#059669">${strong.map(t=>CAPITAL_TRAITS[t].icon).join('')}${strong.length}資本</span>`;
+      }
+      return `<div class="person-entry" onclick="showDetail('${entry.id}')">
+        <span class="date">${ds}</span>
+        <span class="scores">${badges}</span>
+        <span class="del-btn" onclick="event.stopPropagation();deleteResult('${entry.id}')">削除</span>
+      </div>`;
+    }).join('');
+
+    const timelineBtn = hasMultiple
+      ? `<button class="timeline-btn" onclick="event.stopPropagation();showTimeline('${escHtml(group.name)}')">時系列変化を見る（${entries.length}回分）</button>`
+      : '';
+
+    return `<div class="person-group">
+      <div class="person-header">
+        <span class="name">${escHtml(group.name)}</span>
+        <span class="count">${entries.length}回記録</span>
+      </div>
+      <div class="person-entries">${entryRows}${timelineBtn}</div>
+    </div>`;
+  }).join('');
+}
+
+// ============================================================
+// TIMELINE VIEW
+// ============================================================
+function showTimeline(name) {
+  const saved = getSaved().filter(e => e.name.trim().toLowerCase() === name.trim().toLowerCase());
+  if (saved.length < 2) return;
+
+  const sorted = [...saved].sort((a,b) => new Date(a.date) - new Date(b.date));
+  const c = document.getElementById('timelineContent');
+
+  c.innerHTML = `<div class="result-header"><h2>${escHtml(name)} の時系列変化</h2><div class="date">${sorted.length}回の記録</div></div>`;
+
+  // Big Five timeline
+  if (sorted[0].scoresCache.bigfive) {
+    c.innerHTML += `<div class="timeline-section"><h3>ビッグファイブの変化</h3><div class="sub">日付ごとのスコア推移</div><canvas id="tl_bf" width="360" height="220"></canvas>
+      <div class="timeline-legend">${BF_ORDER.map(t => `<span><span class="dot" style="background:${BF_TRAITS[t].color}"></span>${BF_TRAITS[t].name}</span>`).join('')}</div></div>`;
+    c.innerHTML += renderChangeTable(sorted, 'bigfive', BF_ORDER, BF_TRAITS);
+  }
+
+  // Dark Triad timeline
+  if (sorted[0].scoresCache.dark) {
+    c.innerHTML += `<div class="timeline-section"><h3>ダークトライアドの変化</h3><canvas id="tl_dark" width="360" height="200"></canvas>
+      <div class="timeline-legend">${DARK_ORDER.map(t => `<span><span class="dot" style="background:${DARK_TRAITS[t].color}"></span>${DARK_TRAITS[t].name}</span>`).join('')}</div></div>`;
+    c.innerHTML += renderChangeTable(sorted, 'dark', DARK_ORDER, DARK_TRAITS);
+  }
+
+  // 4 Types timeline
+  if (sorted[0].scoresCache.types) {
+    c.innerHTML += `<div class="timeline-section"><h3>4タイプの変化</h3><canvas id="tl_types" width="360" height="200"></canvas>
+      <div class="timeline-legend">${TYPE_ORDER.map(t => `<span><span class="dot" style="background:${TYPE_TRAITS[t].color}"></span>${TYPE_TRAITS[t].name}</span>`).join('')}</div></div>`;
+  }
+
+  // Entrepreneurial timeline
+  if (sorted[0].scoresCache.entre) {
+    c.innerHTML += `<div class="timeline-section"><h3>起業家適性の変化</h3><canvas id="tl_entre" width="360" height="200"></canvas>
+      <div class="timeline-legend">${ENTRE_ORDER.map(t => `<span><span class="dot" style="background:${ENTRE_TRAITS[t].color}"></span>${ENTRE_TRAITS[t].name}</span>`).join('')}</div></div>`;
+    c.innerHTML += renderChangeTable(sorted, 'entre', ENTRE_ORDER, ENTRE_TRAITS);
+  }
+
+  // Capital timeline
+  if (sorted[0].scoresCache.capital) {
+    c.innerHTML += `<div class="timeline-section"><h3>資本論の変化</h3><div class="sub">6つのリソースの推移</div><canvas id="tl_capital" width="360" height="220"></canvas>
+      <div class="timeline-legend">${CAPITAL_ORDER.map(t => `<span><span class="dot" style="background:${CAPITAL_TRAITS[t].color}"></span>${CAPITAL_TRAITS[t].icon}${CAPITAL_TRAITS[t].name}</span>`).join('')}</div></div>`;
+    c.innerHTML += renderChangeTable(sorted, 'capital', CAPITAL_ORDER, CAPITAL_TRAITS);
+  }
+
+  switchTab('timeline');
+  setTimeout(() => {
+    if (sorted[0].scoresCache.bigfive) drawTimeline(sorted, 'bigfive', BF_ORDER, BF_TRAITS, 'tl_bf');
+    if (sorted[0].scoresCache.dark) drawTimeline(sorted, 'dark', DARK_ORDER, DARK_TRAITS, 'tl_dark');
+    if (sorted[0].scoresCache.types) drawTimeline(sorted, 'types', TYPE_ORDER, TYPE_TRAITS, 'tl_types');
+    if (sorted[0].scoresCache.entre) drawTimeline(sorted, 'entre', ENTRE_ORDER, ENTRE_TRAITS, 'tl_entre');
+    if (sorted[0].scoresCache.capital) drawTimeline(sorted, 'capital', CAPITAL_ORDER, CAPITAL_TRAITS, 'tl_capital');
+  }, 80);
+}
+
+function renderChangeTable(sorted, module, order, traitDefs) {
+  if (sorted.length < 2) return '';
+  const first = sorted[0].scoresCache[module];
+  const last = sorted[sorted.length-1].scoresCache[module];
+  const firstDate = new Date(sorted[0].date);
+  const lastDate = new Date(sorted[sorted.length-1].date);
+  const days = Math.round((lastDate - firstDate) / 86400000);
+
+  let rows = order.map(t => {
+    const diff = last[t] - first[t];
+    const cls = diff > 0.2 ? 'change-up' : diff < -0.2 ? 'change-down' : 'change-flat';
+    const arrow = diff > 0.2 ? '+' : diff < -0.2 ? '' : '±';
+    return `<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid var(--border);font-size:.8em">
+      <span style="color:${traitDefs[t].color};font-weight:600">${traitDefs[t].name}</span>
+      <span>${first[t].toFixed(2)} → ${last[t].toFixed(2)} <span class="change-indicator ${cls}">${arrow}${diff.toFixed(2)}</span></span>
+    </div>`;
+  }).join('');
+
+  return `<div class="card"><div style="font-size:.78em;color:var(--text-muted);margin-bottom:6px">${days}日間の変化（初回→最新）</div>${rows}</div>`;
+}
+
+function drawTimeline(entries, module, order, traitDefs, canvasId) {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+  const dpr = window.devicePixelRatio || 1;
+  const cssW = Math.min(360, window.innerWidth - 50);
+  const cssH = module === 'bigfive' ? 220 : 200;
+  canvas.style.width = cssW+'px'; canvas.style.height = cssH+'px';
+  canvas.width = cssW*dpr; canvas.height = cssH*dpr;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr,dpr);
+  ctx.clearRect(0,0,cssW,cssH);
+
+  const pad = {top:15, right:15, bottom:35, left:35};
+  const w = cssW - pad.left - pad.right;
+  const h = cssH - pad.top - pad.bottom;
+  const n = entries.length;
+
+  // Y axis (1-5)
+  ctx.strokeStyle = '#eee'; ctx.lineWidth = 1;
+  ctx.fillStyle = '#aaa'; ctx.font = '10px sans-serif'; ctx.textAlign = 'right';
+  for (let v = 1; v <= 5; v++) {
+    const y = pad.top + h - (v-1)/(5-1)*h;
+    ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(pad.left+w, y); ctx.stroke();
+    ctx.fillText(v, pad.left-5, y+3);
+  }
+
+  // X axis labels
+  ctx.textAlign = 'center'; ctx.fillStyle = '#888'; ctx.font = '9px sans-serif';
+  entries.forEach((entry, i) => {
+    const x = n===1 ? pad.left+w/2 : pad.left + i/(n-1)*w;
+    const d = new Date(entry.date);
+    const label = `${d.getMonth()+1}/${d.getDate()}`;
+    ctx.fillText(label, x, cssH - 5);
+  });
+
+  // Draw lines
+  order.forEach(t => {
+    ctx.beginPath();
+    ctx.strokeStyle = traitDefs[t].color;
+    ctx.lineWidth = 2;
+    entries.forEach((entry, i) => {
+      const x = n===1 ? pad.left+w/2 : pad.left + i/(n-1)*w;
+      const val = entry.scoresCache[module][t];
+      const y = pad.top + h - (val-1)/(5-1)*h;
+      i===0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
+    });
+    ctx.stroke();
+
+    // Dots
+    entries.forEach((entry, i) => {
+      const x = n===1 ? pad.left+w/2 : pad.left + i/(n-1)*w;
+      const val = entry.scoresCache[module][t];
+      const y = pad.top + h - (val-1)/(5-1)*h;
+      ctx.beginPath(); ctx.arc(x,y,3.5,0,Math.PI*2);
+      ctx.fillStyle = traitDefs[t].color; ctx.fill();
+    });
+  });
+}
+
+// ============================================================
+// EXPORT / IMPORT
+// ============================================================
+function exportJSON() {
+  const saved = getSaved();
+  if (!saved.length) { alert('保存データがありません'); return; }
+  const blob = new Blob([JSON.stringify(saved, null, 2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `personality-observer-${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function importJSON(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (!Array.isArray(data)) throw new Error('Invalid format');
+      const existing = getSaved();
+      const existingIds = new Set(existing.map(e => e.id));
+      let added = 0;
+      data.forEach(entry => {
+        if (entry.id && entry.name && entry.date && !existingIds.has(entry.id)) {
+          existing.push(entry);
+          added++;
+        }
+      });
+      existing.sort((a,b) => new Date(b.date) - new Date(a.date));
+      setSaved(existing);
+      renderList();
+      alert(`${added}件のデータをインポートしました（重複は除外）`);
+    } catch(err) {
+      alert('インポート失敗: ' + err.message);
+    }
+  };
+  reader.readAsText(file);
+  event.target.value = '';
+}
+
+function escHtml(s) { const d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
+
+// ============================================================
+// GOOGLE DRIVE SYNC
+// ============================================================
+const GAS_URL_KEY = 'personality_observer_gas_url';
+
+function getGasUrl() { return localStorage.getItem(GAS_URL_KEY) || ''; }
+
+function saveGasUrl() {
+  const url = document.getElementById('gasUrlInput').value.trim();
+  if (!url) { localStorage.removeItem(GAS_URL_KEY); updateDriveUI(); return; }
+  localStorage.setItem(GAS_URL_KEY, url);
+  updateDriveUI();
+  setDriveStatus('URL保存しました', 'var(--success)');
+}
+
+function updateDriveUI() {
+  const url = getGasUrl();
+  const section = document.getElementById('driveSection');
+  const status = document.getElementById('driveStatus');
+  if (url) {
+    section.classList.add('connected');
+    status.textContent = '接続済み';
+    status.className = 'status on';
+  } else {
+    section.classList.remove('connected');
+    status.textContent = '未接続';
+    status.className = 'status off';
+  }
+}
+
+function toggleDrivePanel() {
+  document.getElementById('driveBody').classList.toggle('open');
+}
+
+function setDriveStatus(msg, color) {
+  const el = document.getElementById('driveSyncStatus');
+  el.textContent = msg;
+  el.style.color = color || 'var(--text-muted)';
+  if (msg) setTimeout(() => { if (el.textContent === msg) el.textContent = ''; }, 5000);
+}
+
+async function syncToDrive() {
+  const url = getGasUrl();
+  if (!url) { setDriveStatus('GAS URLが未設定です', 'var(--danger)'); return; }
+  const saved = getSaved();
+  setDriveStatus('Driveに保存中...', 'var(--text-muted)');
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({ data: saved }),
+      mode: 'no-cors'
+    });
+    // GAS web apps with no-cors return opaque response, so we can't read body
+    // Use redirect-based approach instead
+    setDriveStatus('送信完了（Driveに保存されました）', 'var(--success)');
+  } catch (err) {
+    setDriveStatus('保存失敗: ' + err.message, 'var(--danger)');
+  }
+}
+
+async function loadFromDrive() {
+  const url = getGasUrl();
+  if (!url) { setDriveStatus('GAS URLが未設定です', 'var(--danger)'); return; }
+  setDriveStatus('Driveから読込中...', 'var(--text-muted)');
+  try {
+    const res = await fetch(url);
+    const json = await res.json();
+    if (!json.success) { setDriveStatus('読込失敗: ' + (json.error||'不明なエラー'), 'var(--danger)'); return; }
+    const driveData = json.data || [];
+    if (!driveData.length) { setDriveStatus('Driveにデータがありません', 'var(--text-muted)'); return; }
+    // Merge: add entries not already in local
+    const local = getSaved();
+    const localIds = new Set(local.map(e => e.id));
+    let added = 0;
+    driveData.forEach(entry => {
+      if (entry.id && !localIds.has(entry.id)) { local.push(entry); added++; }
+    });
+    local.sort((a,b) => new Date(b.date) - new Date(a.date));
+    setSaved(local);
+    renderList();
+    setDriveStatus(`読込完了（${added}件追加、${driveData.length}件中）`, 'var(--success)');
+  } catch (err) {
+    setDriveStatus('読込失敗: ' + err.message, 'var(--danger)');
+  }
+}
+
+async function autoSyncToDrive() {
+  const url = getGasUrl();
+  if (!url) return;
+  try {
+    await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({ data: getSaved() }),
+      mode: 'no-cors'
+    });
+  } catch(e) { /* silent fail for auto-sync */ }
+}
+
+function showDetail(id) {
+  const entry = getSaved().find(e => e.id === id);
+  if (!entry) return;
+  // Reconstruct state
+  activeModules = entry.modules;
+  allQuestions = [];
+  activeModules.forEach(mid => { QUESTIONS[mid].forEach((q,i) => { allQuestions.push({...q, module:mid, originalIndex:i}); }); });
+  const scores = calcAllScores(entry.answers);
+  const c = document.getElementById('detailContent');
+  const d = new Date(entry.date);
+  const ds = `${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')}`;
+  c.innerHTML = `<div class="result-header"><h2>${escHtml(entry.name)} の予測結果</h2><div class="date">${ds}</div></div><div id="detailResults"></div>`;
+  switchTab('detail');
+  setTimeout(() => renderAllResults(scores, entry.name, 'detailResults'), 50);
+}
+
+// ============================================================
+// AI ANALYSIS
+// ============================================================
+function saveApiKey() {
+  const key = document.getElementById('apiKeyInput').value.trim();
+  if (key) { localStorage.setItem('anthropic_api_key', key); alert('保存しました'); }
+}
+
+function goToAI() {
+  document.getElementById('includeScores').checked = true;
+  switchTab('ai');
+}
+
+function setAIPrompt(text) {
+  const ta = document.getElementById('aiInput');
+  ta.value = (ta.value ? ta.value + '\n\n' : '') + text;
+  ta.focus();
+}
+
+async function runAI() {
+  const apiKey = localStorage.getItem('anthropic_api_key');
+  if (!apiKey) { alert('APIキーを設定してください'); return; }
+  const input = document.getElementById('aiInput').value.trim();
+  if (!input) { alert('テキストを入力してください'); return; }
+
+  const model = document.getElementById('modelSelect').value;
+  const includeScores = document.getElementById('includeScores').checked;
+
+  let context = '';
+  if (includeScores && lastScores) {
+    context = `\n\n【診断結果データ】\n対象者: ${lastTargetName}\n`;
+    if (lastScores.bigfive) {
+      context += '\nビッグファイブ:\n';
+      BF_ORDER.forEach(t => { const s=lastScores.bigfive[t]; context += `  ${BF_TRAITS[t].name}: ${s.avg.toFixed(2)} / ${BF_TRAITS[t].low}: ${s.avgR.toFixed(2)}\n`; });
+    }
+    if (lastScores.dark) {
+      context += '\nダークトライアド:\n';
+      DARK_ORDER.forEach(t => { context += `  ${DARK_TRAITS[t].name}: ${lastScores.dark[t].avg.toFixed(2)}\n`; });
+    }
+    if (lastScores.types) {
+      context += '\n4タイプ:\n';
+      TYPE_ORDER.forEach(t => { context += `  ${TYPE_TRAITS[t].name}: ${lastScores.types[t].avg.toFixed(2)}\n`; });
+    }
+    if (lastScores.entre) {
+      context += '\n起業家適性:\n';
+      ENTRE_ORDER.forEach(t => { context += `  ${ENTRE_TRAITS[t].name}: ${lastScores.entre[t].avg.toFixed(2)}\n`; });
+    }
+    if (lastScores.capital) {
+      context += '\n資本論（6つのリソース）:\n';
+      CAPITAL_ORDER.forEach(t => { context += `  ${CAPITAL_TRAITS[t].icon}${CAPITAL_TRAITS[t].name}: ${lastScores.capital[t].avg.toFixed(2)}\n`; });
+      const strong = CAPITAL_ORDER.filter(t => lastScores.capital[t].avg >= 3.5);
+      if (strong.length >= 2) context += `  → 組み合わせ可能: ${strong.map(t=>CAPITAL_TRAITS[t].name).join('×')}\n`;
+    }
+  }
+
+  const systemPrompt = `あなたは性格分析・コーチングの専門家です。ビッグファイブ、ダークトライアド、コミュニケーション4タイプ（コントローラー/プロモーター/サポーター/アナライザー）、起業家適性、そして橘玲「幸福の資本論」をベースにした6つの資本（金融・人的・社会・身体・精神・知識）に精通しています。
+
+**資本論の考え方**: 6つの資本は目標達成のためのリソースであり、2つ以上の資本を組み合わせることで目標達成の可能性が高まる。
+
+以下のルールで分析してください：
+
+1. **多角的な分析**: 一つの解釈に寄せず、複数の可能性を提示する
+2. **別の視点**: 「こう見えるけど、実は…」という裏読みを必ず含める
+3. **盲点の指摘**: 観察者が見落としている可能性、バイアスの指摘
+4. **ビジネスでの活かし方**: この人とどう付き合い、どう活かすか
+5. **深掘りの質問**: より正確に理解するために確認すべき3つの質問
+
+忖度せず率直に。一般論ではなく具体的に。日本語で回答。`;
+
+  const userMessage = input + context;
+
+  document.getElementById('aiResult').innerHTML = '<div class="ai-loading">分析中...</div>';
+
+  try {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({
+        model: model,
+        max_tokens: 4096,
+        system: systemPrompt,
+        messages: [{ role: 'user', content: userMessage }]
+      })
+    });
+
+    if (!response.ok) {
+      const err = await response.json();
+      throw new Error(err.error?.message || 'API Error');
+    }
+
+    const data = await response.json();
+    const text = data.content[0].text;
+    document.getElementById('aiResult').innerHTML = `<div class="ai-result">${formatAIResponse(text)}</div>`;
+  } catch (e) {
+    document.getElementById('aiResult').innerHTML = `<div class="card" style="color:var(--danger)">エラー: ${escHtml(e.message)}</div>`;
+  }
+}
+
+async function runCoachingAI() {
+  const apiKey = localStorage.getItem('anthropic_api_key');
+  if (!apiKey) { alert('APIキーを設定してください'); return; }
+
+  const model = document.getElementById('modelSelect').value;
+
+  // Gather all saved data for the target person
+  let targetName = lastTargetName || document.getElementById('aiInput').value.trim().split('\n')[0];
+  const saved = getSaved();
+
+  // Find entries for this person (or use all if no specific target)
+  let personEntries = [];
+  if (targetName) {
+    const key = targetName.trim().toLowerCase();
+    personEntries = saved.filter(e => e.name.trim().toLowerCase() === key);
+  }
+  if (!personEntries.length && lastScores) {
+    // Use current session data
+    personEntries = [{ name: targetName || '対象者', date: new Date().toISOString(), scoresCache: {} }];
+    if (lastScores.bigfive) { personEntries[0].scoresCache.bigfive = {}; BF_ORDER.forEach(t => personEntries[0].scoresCache.bigfive[t] = lastScores.bigfive[t].avg); }
+    if (lastScores.dark) { personEntries[0].scoresCache.dark = {}; DARK_ORDER.forEach(t => personEntries[0].scoresCache.dark[t] = lastScores.dark[t].avg); }
+    if (lastScores.types) { personEntries[0].scoresCache.types = {}; TYPE_ORDER.forEach(t => personEntries[0].scoresCache.types[t] = lastScores.types[t].avg); }
+    if (lastScores.entre) { personEntries[0].scoresCache.entre = {}; ENTRE_ORDER.forEach(t => personEntries[0].scoresCache.entre[t] = lastScores.entre[t].avg); }
+    if (lastScores.capital) { personEntries[0].scoresCache.capital = {}; CAPITAL_ORDER.forEach(t => personEntries[0].scoresCache.capital[t] = lastScores.capital[t].avg); }
+  }
+  if (!personEntries.length) { alert('分析対象のデータがありません。先に診断を実施するか、名前を入力してください。'); return; }
+
+  targetName = personEntries[0].name;
+
+  // Build comprehensive data string
+  let dataStr = `【${targetName} の全診断データ（${personEntries.length}回分）】\n`;
+  personEntries.sort((a,b) => new Date(a.date) - new Date(b.date));
+  personEntries.forEach((entry, idx) => {
+    const d = new Date(entry.date);
+    dataStr += `\n--- ${idx+1}回目（${d.toLocaleDateString('ja-JP')}）---\n`;
+    const sc = entry.scoresCache;
+    if (sc.bigfive) { dataStr += 'ビッグファイブ: '; dataStr += BF_ORDER.map(t => `${BF_TRAITS[t].name}=${(sc.bigfive[t]||0).toFixed?sc.bigfive[t].toFixed(2):sc.bigfive[t]}`).join(', ') + '\n'; }
+    if (sc.dark) { dataStr += 'ダークトライアド: '; dataStr += DARK_ORDER.map(t => `${DARK_TRAITS[t].name}=${(sc.dark[t]||0).toFixed?sc.dark[t].toFixed(2):sc.dark[t]}`).join(', ') + '\n'; }
+    if (sc.types) { dataStr += '4タイプ: '; dataStr += TYPE_ORDER.map(t => `${TYPE_TRAITS[t].name}=${(sc.types[t]||0).toFixed?sc.types[t].toFixed(2):sc.types[t]}`).join(', ') + '\n'; }
+    if (sc.entre) { dataStr += '起業家適性: '; dataStr += ENTRE_ORDER.map(t => `${ENTRE_TRAITS[t].name}=${(sc.entre[t]||0).toFixed?sc.entre[t].toFixed(2):sc.entre[t]}`).join(', ') + '\n'; }
+    if (sc.capital) { dataStr += '資本論: '; dataStr += CAPITAL_ORDER.map(t => `${CAPITAL_TRAITS[t].icon}${CAPITAL_TRAITS[t].name}=${(sc.capital[t]||0).toFixed?sc.capital[t].toFixed(2):sc.capital[t]}`).join(', ') + '\n'; }
+  });
+
+  // Add free text if any
+  const freeText = document.getElementById('aiInput').value.trim();
+  if (freeText) dataStr += `\n【観察者の自由記述】\n${freeText}\n`;
+
+  const coachingPrompt = `あなたはプロのコーチング専門家であり、性格心理学・行動科学・橘玲「幸福の資本論」に精通しています。
+
+**核となる考え方**:
+- 6つの資本（金融・人的・社会・身体・精神・知識）は目標達成のためのリソース
+- 2つ以上の資本を組み合わせることで、目標達成の可能性が飛躍的に高まる
+- 性格特性（ビッグファイブ等）は資本の活かし方や伸ばし方に影響する
+
+以下の構成で、この人の**コーチング分析**を行ってください：
+
+## 1. この人の現在地（強み・武器）
+- 全データを横断して、この人が今持っている最大の武器を特定
+- 性格×資本の組み合わせで見える強み
+
+## 2. 惜しいところ（あと少しで化ける）
+- 「ほんの少し伸ばせば大きく変わる」能力・資本を具体的に指摘
+- なぜそれが惜しいのか、数値根拠とともに
+
+## 3. 直すべきところ（足を引っ張っている要素）
+- 性格特性やダークトライアドの中で、目標達成を妨げている要素
+- 本人が気づいていない可能性のあるブロッカー
+
+## 4. リソースの組み合わせ戦略
+- 今ある資本でどんな目標が達成可能か
+- 「もし○○資本を3.5以上まで上げたら、△△と掛け合わせてこうなれる」という具体的シナリオ
+
+## 5. 具体的アクションプラン
+- 今日からできる3つの行動提案
+- 短期（1ヶ月）と中期（半年）の目標設定
+
+忖度せず率直に。一般論ではなく、このデータに基づいた具体的な分析を。日本語で回答。`;
+
+  document.getElementById('aiResult').innerHTML = '<div class="ai-loading">総合コーチング分析中...</div>';
+
+  try {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({
+        model: model,
+        max_tokens: 4096,
+        system: coachingPrompt,
+        messages: [{ role: 'user', content: dataStr }]
+      })
+    });
+
+    if (!response.ok) {
+      const err = await response.json();
+      throw new Error(err.error?.message || 'API Error');
+    }
+
+    const data = await response.json();
+    const text = data.content[0].text;
+    document.getElementById('aiResult').innerHTML = `<div class="ai-result">${formatAIResponse(text)}</div>`;
+  } catch (e) {
+    document.getElementById('aiResult').innerHTML = `<div class="card" style="color:var(--danger)">エラー: ${escHtml(e.message)}</div>`;
+  }
+}
+
+function formatAIResponse(text) {
+  // Basic markdown-like formatting
+  return text
+    .replace(/\*\*(.+?)\*\*/g, '<b>$1</b>')
+    .replace(/\*(.+?)\*/g, '<i>$1</i>')
+    .replace(/^### (.+)$/gm, '<div style="font-size:1.05em;font-weight:800;margin:14px 0 6px;color:var(--dark)">$1</div>')
+    .replace(/^## (.+)$/gm, '<div style="font-size:1.1em;font-weight:800;margin:16px 0 8px;color:var(--accent)">$1</div>')
+    .replace(/^# (.+)$/gm, '<div style="font-size:1.15em;font-weight:800;margin:18px 0 10px">$1</div>')
+    .replace(/^- (.+)$/gm, '<div style="padding-left:12px">・$1</div>')
+    .replace(/^(\d+)\. (.+)$/gm, '<div style="padding-left:12px">$1. $2</div>')
+    .replace(/\n\n/g, '<br><br>')
+    .replace(/\n/g, '<br>');
+}
+
+// ============================================================
+// RESET
+// ============================================================
+function resetAll() {
+  answers = {};
+  currentPage = 0;
+  lastScores = null;
+  lastTargetName = '';
+  document.getElementById('targetName').value = '';
+  document.getElementById('setupPhase').style.display = '';
+  document.getElementById('questionPhase').style.display = 'none';
+  document.getElementById('resultPhase').style.display = 'none';
+  renderModuleGrid();
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+// ============================================================
+// INIT
+// ============================================================
+renderModuleGrid();
+updateBadge();
+// Restore API key
+const savedKey = localStorage.getItem('anthropic_api_key');
+if (savedKey) document.getElementById('apiKeyInput').value = savedKey;
+// Restore GAS URL & Drive UI
+const savedGasUrl = getGasUrl();
+if (savedGasUrl) document.getElementById('gasUrlInput').value = savedGasUrl;
+updateDriveUI();
+</script>
+</body>
+</html>
