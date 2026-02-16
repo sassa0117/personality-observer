@@ -436,7 +436,7 @@ canvas{max-width:100%;height:auto}
     </div>
     <div class="chat-messages" id="chatMessages"></div>
     <div class="chat-input-bar">
-      <textarea id="chatInput" placeholder="この人について質問..." rows="2" oninput="autoResize(this)" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChat()}"></textarea>
+      <textarea id="chatInput" placeholder="この人について質問..." rows="2" oninput="autoResize(this)"></textarea>
       <button onclick="sendChat()" id="chatSendBtn">送信</button>
     </div>
   </div>
