@@ -424,6 +424,16 @@ canvas{max-width:100%;height:auto}
         <div style="font-size:.68em;color:var(--text-muted);margin-top:6px">Anthropic APIキーを入力。ブラウザのlocalStorageにのみ保存されます。</div>
       </div>
     </div>
+    <div class="card" style="padding:10px 14px;margin-bottom:10px;cursor:pointer" onclick="document.getElementById('contextBody').classList.toggle('open')">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <span style="font-size:.82em;font-weight:700;color:var(--text-muted)">前提情報</span>
+        <span style="font-size:.68em;color:var(--text-muted)" id="contextIndicator">設定なし</span>
+      </div>
+      <div id="contextBody" class="drive-body" onclick="event.stopPropagation()">
+        <div style="font-size:.72em;color:var(--text-muted);margin:8px 0 6px">この人に関する背景情報（ワークの頻度、関係性、状況など）。AIの分析精度が上がります。</div>
+        <textarea id="contextInput" class="ai-textarea" style="min-height:80px;font-size:.85em" placeholder="例：月1回のワークで会う程度。自分はコーチ役。相手は副業で物販をしている30代男性。" oninput="saveContext()"></textarea>
+      </div>
+    </div>
     <div class="chat-messages" id="chatMessages"></div>
     <div class="chat-input-bar">
       <textarea id="chatInput" placeholder="この人について質問..." rows="2" oninput="autoResize(this)" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChat()}"></textarea>
@@ -1709,6 +1719,15 @@ let chatPersonName = '';
 let chatHistory = []; // {role:'user'|'assistant'|'system', content:string, time:string}
 
 function getChatKey(name) { return 'po_chat_' + name.trim().toLowerCase(); }
+function getContextKey(name) { return 'po_ctx_' + name.trim().toLowerCase(); }
+function getContext(name) { return localStorage.getItem(getContextKey(name)) || ''; }
+function saveContext() {
+  if (!chatPersonName) return;
+  const val = document.getElementById('contextInput').value;
+  localStorage.setItem(getContextKey(chatPersonName), val);
+  document.getElementById('contextIndicator').textContent = val.trim() ? '設定あり' : '設定なし';
+  document.getElementById('contextIndicator').style.color = val.trim() ? 'var(--success)' : 'var(--text-muted)';
+}
 
 function loadChatHistory(name) {
   try { return JSON.parse(localStorage.getItem(getChatKey(name)) || '[]'); } catch { return []; }
@@ -1732,6 +1751,8 @@ function buildPersonDataStr(name) {
     if (sc.entre) { s += '起業家適性: ' + ENTRE_ORDER.map(t => `${ENTRE_TRAITS[t].name}=${Number(sc.entre[t]).toFixed(2)}`).join(', ') + '\n'; }
     if (sc.capital) { s += '資本論: ' + CAPITAL_ORDER.map(t => `${CAPITAL_TRAITS[t].icon}${CAPITAL_TRAITS[t].name}=${Number(sc.capital[t]).toFixed(2)}`).join(', ') + '\n'; }
   });
+  const ctx = getContext(name);
+  if (ctx.trim()) s += `\n【前提情報（観察者が設定）】\n${ctx.trim()}\n`;
   return s;
 }
 
@@ -1742,6 +1763,13 @@ function openChat(name) {
   const saved = getSaved().filter(e => e.name.trim().toLowerCase() === name.trim().toLowerCase());
   document.getElementById('chatHeader').innerHTML = `
     <div><div class="name">${escHtml(name)}</div><div class="meta">${saved.length}回の診断データ</div></div>`;
+
+  // Load context
+  const ctx = getContext(name);
+  document.getElementById('contextInput').value = ctx;
+  document.getElementById('contextIndicator').textContent = ctx.trim() ? '設定あり' : '設定なし';
+  document.getElementById('contextIndicator').style.color = ctx.trim() ? 'var(--success)' : 'var(--text-muted)';
+  document.getElementById('contextBody').classList.remove('open');
 
   renderChatMessages();
 
