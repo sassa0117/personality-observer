@@ -253,6 +253,23 @@ canvas{max-width:100%;height:auto}
   .calc-row .calc-formula{text-align:left}
   .interp{flex-direction:column}
 }
+
+/* Chat View */
+.chat-person-header{display:flex;align-items:center;gap:10px;padding:12px 16px;background:var(--surface);border-radius:var(--radius);box-shadow:var(--shadow);margin-bottom:12px}
+.chat-person-header .name{font-weight:800;font-size:1em;flex:1}
+.chat-person-header .meta{font-size:.72em;color:var(--text-muted)}
+.chat-messages{display:flex;flex-direction:column;gap:10px;margin-bottom:12px;min-height:100px}
+.chat-msg{max-width:88%;padding:12px 16px;border-radius:16px;font-size:.88em;line-height:1.7;word-break:break-word}
+.chat-msg.user{align-self:flex-end;background:var(--accent);color:#fff;border-bottom-right-radius:4px}
+.chat-msg.ai{align-self:flex-start;background:var(--surface);box-shadow:var(--shadow);border-bottom-left-radius:4px}
+.chat-msg.system{align-self:center;background:var(--success-bg);color:#166534;font-size:.78em;text-align:center;border-radius:10px;max-width:95%}
+.chat-msg .time{font-size:.62em;opacity:.6;margin-top:4px;display:block}
+.chat-input-bar{position:sticky;bottom:0;display:flex;gap:8px;padding:10px 0;background:var(--bg)}
+.chat-input-bar textarea{flex:1;padding:11px 14px;border:2px solid var(--border);border-radius:14px;font-size:.9em;line-height:1.5;resize:none;outline:none;font-family:inherit;background:var(--surface);min-height:44px;max-height:120px}
+.chat-input-bar textarea:focus{border-color:var(--accent)}
+.chat-input-bar button{padding:0 18px;border-radius:14px;border:none;background:var(--accent);color:#fff;font-weight:700;font-size:.88em;cursor:pointer;flex-shrink:0;-webkit-tap-highlight-color:transparent}
+.chat-input-bar button:disabled{opacity:.3}
+.chat-loading{text-align:center;padding:16px;color:var(--accent);font-size:.82em;font-weight:600}
 </style>
 </head>
 <body>
@@ -391,6 +408,17 @@ canvas{max-width:100%;height:auto}
   <div class="view" id="view-detail">
     <div class="detail-back" onclick="switchTab('list')">← 一覧に戻る</div>
     <div id="detailContent"></div>
+  </div>
+
+  <!-- ===== CHAT VIEW ===== -->
+  <div class="view" id="view-chat">
+    <div class="detail-back" onclick="switchTab('list')">← 一覧に戻る</div>
+    <div class="chat-person-header" id="chatHeader"></div>
+    <div class="chat-messages" id="chatMessages"></div>
+    <div class="chat-input-bar">
+      <textarea id="chatInput" placeholder="この人について質問..." rows="1" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChat()}"></textarea>
+      <button onclick="sendChat()" id="chatSendBtn">送信</button>
+    </div>
   </div>
 </div>
 
@@ -1104,13 +1132,14 @@ function renderList() {
     const timelineBtn = hasMultiple
       ? `<button class="timeline-btn" onclick="event.stopPropagation();showTimeline('${escHtml(group.name)}')">時系列変化を見る（${entries.length}回分）</button>`
       : '';
+    const chatBtn = `<button class="timeline-btn" style="background:#ecfdf5;color:#059669;border-top:1px solid var(--border)" onclick="event.stopPropagation();openChat('${escHtml(group.name)}')">総合AI分析・チャット</button>`;
 
     return `<div class="person-group">
       <div class="person-header">
         <span class="name">${escHtml(group.name)}</span>
         <span class="count">${entries.length}回記録</span>
       </div>
-      <div class="person-entries">${entryRows}${timelineBtn}</div>
+      <div class="person-entries">${entryRows}${timelineBtn}${chatBtn}</div>
     </div>`;
   }).join('');
 }
@@ -1638,6 +1667,223 @@ function formatAIResponse(text) {
     .replace(/^(\d+)\. (.+)$/gm, '<div style="padding-left:12px">$1. $2</div>')
     .replace(/\n\n/g, '<br><br>')
     .replace(/\n/g, '<br>');
+}
+
+// ============================================================
+// CHAT VIEW (per-person AI analysis + conversation)
+// ============================================================
+let chatPersonName = '';
+let chatHistory = []; // {role:'user'|'assistant'|'system', content:string, time:string}
+
+function getChatKey(name) { return 'po_chat_' + name.trim().toLowerCase(); }
+
+function loadChatHistory(name) {
+  try { return JSON.parse(localStorage.getItem(getChatKey(name)) || '[]'); } catch { return []; }
+}
+function saveChatHistory(name, history) {
+  localStorage.setItem(getChatKey(name), JSON.stringify(history));
+}
+
+function buildPersonDataStr(name) {
+  const saved = getSaved().filter(e => e.name.trim().toLowerCase() === name.trim().toLowerCase());
+  if (!saved.length) return '';
+  const sorted = [...saved].sort((a,b) => new Date(a.date) - new Date(b.date));
+  let s = `【${name} の全診断データ（${sorted.length}回分）】\n`;
+  sorted.forEach((entry, idx) => {
+    const d = new Date(entry.date);
+    s += `\n--- ${idx+1}回目（${d.toLocaleDateString('ja-JP')}）---\n`;
+    const sc = entry.scoresCache;
+    if (sc.bigfive) { s += 'ビッグファイブ: ' + BF_ORDER.map(t => `${BF_TRAITS[t].name}=${Number(sc.bigfive[t]).toFixed(2)}`).join(', ') + '\n'; }
+    if (sc.dark) { s += 'ダークトライアド: ' + DARK_ORDER.map(t => `${DARK_TRAITS[t].name}=${Number(sc.dark[t]).toFixed(2)}`).join(', ') + '\n'; }
+    if (sc.types) { s += '4タイプ: ' + TYPE_ORDER.map(t => `${TYPE_TRAITS[t].name}=${Number(sc.types[t]).toFixed(2)}`).join(', ') + '\n'; }
+    if (sc.entre) { s += '起業家適性: ' + ENTRE_ORDER.map(t => `${ENTRE_TRAITS[t].name}=${Number(sc.entre[t]).toFixed(2)}`).join(', ') + '\n'; }
+    if (sc.capital) { s += '資本論: ' + CAPITAL_ORDER.map(t => `${CAPITAL_TRAITS[t].icon}${CAPITAL_TRAITS[t].name}=${Number(sc.capital[t]).toFixed(2)}`).join(', ') + '\n'; }
+  });
+  return s;
+}
+
+function openChat(name) {
+  chatPersonName = name;
+  chatHistory = loadChatHistory(name);
+
+  const saved = getSaved().filter(e => e.name.trim().toLowerCase() === name.trim().toLowerCase());
+  document.getElementById('chatHeader').innerHTML = `
+    <div><div class="name">${escHtml(name)}</div><div class="meta">${saved.length}回の診断データ</div></div>`;
+
+  renderChatMessages();
+
+  // If no history, auto-run coaching analysis
+  if (!chatHistory.length) {
+    switchTab('chat');
+    runInitialCoaching(name);
+  } else {
+    switchTab('chat');
+  }
+}
+
+function renderChatMessages() {
+  const c = document.getElementById('chatMessages');
+  c.innerHTML = chatHistory.map(msg => {
+    if (msg.role === 'system') {
+      return `<div class="chat-msg system">${escHtml(msg.content)}<span class="time">${msg.time||''}</span></div>`;
+    } else if (msg.role === 'user') {
+      return `<div class="chat-msg user">${escHtml(msg.content)}<span class="time">${msg.time||''}</span></div>`;
+    } else {
+      return `<div class="chat-msg ai">${formatAIResponse(msg.content)}<span class="time">${msg.time||''}</span></div>`;
+    }
+  }).join('');
+  // Scroll to bottom
+  setTimeout(() => c.scrollTop = c.scrollHeight, 50);
+}
+
+function nowStr() {
+  const d = new Date();
+  return `${d.getMonth()+1}/${d.getDate()} ${d.getHours()}:${String(d.getMinutes()).padStart(2,'0')}`;
+}
+
+async function runInitialCoaching(name) {
+  const apiKey = localStorage.getItem('anthropic_api_key');
+  if (!apiKey) {
+    chatHistory.push({role:'system', content:'APIキーが未設定です。「AI分析」タブでAPIキーを設定してください。', time:nowStr()});
+    saveChatHistory(name, chatHistory);
+    renderChatMessages();
+    return;
+  }
+
+  const dataStr = buildPersonDataStr(name);
+  if (!dataStr) {
+    chatHistory.push({role:'system', content:'診断データがありません。', time:nowStr()});
+    saveChatHistory(name, chatHistory);
+    renderChatMessages();
+    return;
+  }
+
+  chatHistory.push({role:'system', content:'総合コーチング分析を実行中...', time:nowStr()});
+  renderChatMessages();
+
+  const model = document.getElementById('modelSelect').value;
+  const coachingPrompt = `あなたはプロのコーチング専門家であり、性格心理学・行動科学・橘玲「幸福の資本論」に精通しています。
+
+**核となる考え方**:
+- 6つの資本（金融・人的・社会・身体・精神・知識）は目標達成のためのリソース
+- 2つ以上の資本を組み合わせることで、目標達成の可能性が飛躍的に高まる
+- 性格特性（ビッグファイブ等）は資本の活かし方や伸ばし方に影響する
+
+以下の構成でコーチング分析を行い、その後の質問にも答えてください：
+
+## 1. この人の現在地（強み・武器）
+## 2. 惜しいところ（あと少しで化ける）
+## 3. 直すべきところ（足を引っ張っている要素）
+## 4. リソースの組み合わせ戦略
+## 5. 具体的アクションプラン
+
+忖度せず率直に。一般論ではなく、このデータに基づいた具体的な分析を。日本語で回答。`;
+
+  try {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({
+        model: model,
+        max_tokens: 4096,
+        system: coachingPrompt,
+        messages: [{ role: 'user', content: dataStr }]
+      })
+    });
+
+    if (!response.ok) {
+      const err = await response.json();
+      throw new Error(err.error?.message || 'API Error');
+    }
+
+    const data = await response.json();
+    const text = data.content[0].text;
+    // Replace the loading message
+    chatHistory.pop();
+    chatHistory.push({role:'assistant', content: text, time: nowStr()});
+    saveChatHistory(name, chatHistory);
+    renderChatMessages();
+  } catch (e) {
+    chatHistory.pop();
+    chatHistory.push({role:'system', content:'エラー: ' + e.message, time: nowStr()});
+    saveChatHistory(name, chatHistory);
+    renderChatMessages();
+  }
+}
+
+async function sendChat() {
+  const input = document.getElementById('chatInput');
+  const text = input.value.trim();
+  if (!text || !chatPersonName) return;
+
+  const apiKey = localStorage.getItem('anthropic_api_key');
+  if (!apiKey) { alert('APIキーを設定してください'); return; }
+
+  input.value = '';
+  chatHistory.push({role:'user', content: text, time: nowStr()});
+  chatHistory.push({role:'system', content:'考え中...', time:''});
+  saveChatHistory(chatPersonName, chatHistory);
+  renderChatMessages();
+
+  const dataStr = buildPersonDataStr(chatPersonName);
+  const model = document.getElementById('modelSelect').value;
+
+  const systemPrompt = `あなたは性格分析・コーチングの専門家です。以下の診断データを持つ「${chatPersonName}」について、ユーザーの質問に答えてください。
+
+${dataStr}
+
+**分析の姿勢**:
+- 忖度せず率直に
+- 多角的な視点（「こう見えるけど実は…」を含める）
+- 資本論の考え方: 2つ以上の資本を組み合わせることで目標達成
+- 惜しいところ、少し伸ばせば変わるところに注目
+- 日本語で回答`;
+
+  // Build messages from chat history (exclude system messages and the loading one)
+  const messages = chatHistory
+    .filter(m => m.role === 'user' || m.role === 'assistant')
+    .map(m => ({role: m.role, content: m.content}));
+
+  try {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({
+        model: model,
+        max_tokens: 4096,
+        system: systemPrompt,
+        messages: messages
+      })
+    });
+
+    if (!response.ok) {
+      const err = await response.json();
+      throw new Error(err.error?.message || 'API Error');
+    }
+
+    const data = await response.json();
+    const reply = data.content[0].text;
+    // Replace loading message
+    chatHistory.pop();
+    chatHistory.push({role:'assistant', content: reply, time: nowStr()});
+    saveChatHistory(chatPersonName, chatHistory);
+    renderChatMessages();
+  } catch (e) {
+    chatHistory.pop();
+    chatHistory.push({role:'system', content:'エラー: ' + e.message, time: nowStr()});
+    saveChatHistory(chatPersonName, chatHistory);
+    renderChatMessages();
+  }
 }
 
 // ============================================================
