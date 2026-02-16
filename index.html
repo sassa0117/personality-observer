@@ -384,8 +384,8 @@ canvas{max-width:100%;height:auto}
           <button onclick="saveGasUrl()">保存</button>
         </div>
         <div class="drive-buttons">
-          <button class="sync-btn" onclick="syncToDrive()">Driveに保存</button>
-          <button class="load-btn" onclick="loadFromDrive()">Driveから読込</button>
+          <button class="sync-btn" style="flex:2" onclick="fullSync()">同期する</button>
+          <button class="load-btn" onclick="loadFromDrive()">読込のみ</button>
         </div>
         <div class="drive-sync-status" id="driveSyncStatus"></div>
       </div>
@@ -1439,26 +1439,18 @@ function setDriveStatus(msg, color) {
   if (msg) setTimeout(() => { if (el.textContent === msg) el.textContent = ''; }, 5000);
 }
 
-async function syncToDrive() {
-  const url = getGasUrl();
-  if (!url) { setDriveStatus('GAS URLが未設定です', 'var(--danger)'); return; }
-  const saved = getSaved();
-  setDriveStatus('Driveに保存中...', 'var(--text-muted)');
-  try {
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain' },
-      body: JSON.stringify({ data: saved }),
-      mode: 'no-cors'
-    });
-    // GAS web apps with no-cors return opaque response, so we can't read body
-    // Use redirect-based approach instead
-    setDriveStatus('送信完了（Driveに保存されました）', 'var(--success)');
-  } catch (err) {
-    setDriveStatus('保存失敗: ' + err.message, 'var(--danger)');
-  }
+// Merge helper: combine local + remote, deduplicate by ID
+function mergeData(local, remote) {
+  const idSet = new Set(local.map(e => e.id));
+  let added = 0;
+  remote.forEach(entry => {
+    if (entry.id && !idSet.has(entry.id)) { local.push(entry); idSet.add(entry.id); added++; }
+  });
+  local.sort((a,b) => new Date(b.date) - new Date(a.date));
+  return { merged: local, added };
 }
 
+// Pull from Drive (read only, merge into local)
 async function loadFromDrive() {
   const url = getGasUrl();
   if (!url) { setDriveStatus('GAS URLが未設定です', 'var(--danger)'); return; }
@@ -1469,33 +1461,64 @@ async function loadFromDrive() {
     if (!json.success) { setDriveStatus('読込失敗: ' + (json.error||'不明なエラー'), 'var(--danger)'); return; }
     const driveData = json.data || [];
     if (!driveData.length) { setDriveStatus('Driveにデータがありません', 'var(--text-muted)'); return; }
-    // Merge: add entries not already in local
-    const local = getSaved();
-    const localIds = new Set(local.map(e => e.id));
-    let added = 0;
-    driveData.forEach(entry => {
-      if (entry.id && !localIds.has(entry.id)) { local.push(entry); added++; }
-    });
-    local.sort((a,b) => new Date(b.date) - new Date(a.date));
-    setSaved(local);
+    const { merged, added } = mergeData(getSaved(), driveData);
+    setSaved(merged);
     renderList();
-    setDriveStatus(`読込完了（${added}件追加、${driveData.length}件中）`, 'var(--success)');
+    setDriveStatus(`読込完了（${added}件追加）`, 'var(--success)');
   } catch (err) {
     setDriveStatus('読込失敗: ' + err.message, 'var(--danger)');
   }
 }
 
+// Push to Drive
+async function pushToDrive(data) {
+  const url = getGasUrl();
+  await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain' },
+    body: JSON.stringify({ data }),
+    mode: 'no-cors'
+  });
+}
+
+// Full sync: pull → merge → push (safe for multi-user)
+async function fullSync() {
+  const url = getGasUrl();
+  if (!url) { setDriveStatus('GAS URLが未設定です', 'var(--danger)'); return; }
+  setDriveStatus('同期中...（1/2 読込）', 'var(--text-muted)');
+  try {
+    // Step 1: Pull from Drive
+    const res = await fetch(url);
+    const json = await res.json();
+    const driveData = (json.success && json.data) ? json.data : [];
+
+    // Step 2: Merge
+    const { merged, added } = mergeData(getSaved(), driveData);
+    setSaved(merged);
+
+    // Step 3: Push merged result back
+    setDriveStatus('同期中...（2/2 保存）', 'var(--text-muted)');
+    await pushToDrive(merged);
+
+    renderList();
+    setDriveStatus(`同期完了（${added}件取得、合計${merged.length}件）`, 'var(--success)');
+  } catch (err) {
+    setDriveStatus('同期失敗: ' + err.message, 'var(--danger)');
+  }
+}
+
+// Auto sync on save (pull → merge → push, silent)
 async function autoSyncToDrive() {
   const url = getGasUrl();
   if (!url) return;
   try {
-    await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain' },
-      body: JSON.stringify({ data: getSaved() }),
-      mode: 'no-cors'
-    });
-  } catch(e) { /* silent fail for auto-sync */ }
+    const res = await fetch(url);
+    const json = await res.json();
+    const driveData = (json.success && json.data) ? json.data : [];
+    const { merged } = mergeData(getSaved(), driveData);
+    setSaved(merged);
+    await pushToDrive(merged);
+  } catch(e) { /* silent fail */ }
 }
 
 function showDetail(id) {
